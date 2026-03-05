@@ -326,37 +326,117 @@ Should be close to 1. Checks whether the **spread** is similar, not just the ave
 
 Plot SMDs for each covariate before and after matching. You want all dots to move toward zero.
 
-## C.5 Why Matching Reduces Bias (the Chebyshev argument)
+## C.5 The Matched Estimator and Where Bias Comes From
 
-For matched pairs, define pairwise covariate differences: $D_i = X_i - X_{j(i)}$
+After matching, you estimate the treatment effect by comparing outcomes within matched pairs:
 
-If the outcome model is $Y_i = \tau Z_i + g(X_i) + \varepsilon_i$, the bias of the matched estimator is:
+$$\hat{\tau}^M = \frac{1}{n_M}\sum_{i=1}^{n_M}\big(Y_i - Y_{j(i)}\big)$$
+
+where $i$ is a treated person and $j(i)$ is their matched control. This is just: take each pair, subtract the control outcome from the treated outcome, and average.
+
+### When is this estimator biased?
+
+Suppose the outcome depends on both treatment and covariates:
+
+$$Y_i = \tau Z_i + g(X_i) + \varepsilon_i$$
+
+Here $g(X_i)$ is the part of the outcome that comes from the person's background -- not from the treatment. For a matched pair:
+
+- Treated person's outcome: $\tau + g(X_i) + \varepsilon_i$
+- Control person's outcome: $g(X_{j(i)}) + \varepsilon_{j(i)}$
+- Difference: $\tau + \big(g(X_i) - g(X_{j(i)})\big) + (\varepsilon_i - \varepsilon_{j(i)})$
+
+The bias in one pair is $g(X_i) - g(X_{j(i)})$ -- the difference in background effects between the two people. Average over all pairs:
 
 $$\text{Bias}(\hat{\tau}^M) = \frac{1}{n_M}\sum_{i=1}^{n_M}\big(g(X_i) - g(X_{j(i)})\big)$$
 
-If $g$ is Lipschitz (smooth, doesn't jump around wildly) with constant $L$:
+**The punchline:** If you match well (each treated person is paired with a similar control), then $X_i \approx X_{j(i)}$, which means $g(X_i) \approx g(X_{j(i)})$, which means the bias is small.
 
-$$|\text{Bias}(\hat{\tau}^M)| \le L \cdot \frac{1}{n_M}\sum|D_i|$$
+If you match badly (pairs are dissimilar), then $g(X_i)$ and $g(X_{j(i)})$ can be very different, and you get large bias.
 
-And using Chebyshev's inequality to bound the average of $|D_i|$:
+## C.6 What "Smooth" Means and Why It Matters (the Lipschitz Condition)
+
+You might ask: if the matched covariates are *close* ($X_i \approx X_{j(i)}$), does that guarantee $g(X_i) \approx g(X_{j(i)})$?
+
+It depends on how $g$ behaves. If $g$ is a smooth, gentle function (like a straight line or a gentle curve), then two people with similar $X$ values will have similar $g(X)$ values. But if $g$ is wild and jagged (like a function that jumps around erratically), then even people with very similar $X$ could have very different $g(X)$.
+
+The **Lipschitz condition** is just a formal way of saying "$g$ is not too wild." It says:
+
+$$|g(a) - g(b)| \le L \cdot |a - b| \quad \text{for all } a, b$$
+
+**Translation:** The difference in outputs can't be more than $L$ times the difference in inputs. The number $L$ (called the Lipschitz constant) measures the **maximum steepness** of $g$.
+
+- Small $L$ = $g$ is gentle, changes slowly. Even mediocre matching gives small bias.
+- Large $L$ = $g$ is steep, changes fast. You need very close matches to keep bias small.
+- $L = 0$ = $g$ is flat (constant). Background doesn't affect outcomes. No bias regardless of matching quality.
+
+**Example:** Suppose income affects health outcomes, and $g(\text{income}) = 0.001 \times \text{income}$. Then $L = 0.001$ -- even if matched pairs differ by $\$5000$ in income, the bias contribution from one pair is only $0.001 \times 5000 = 5$ units. Now if $g$ were steeper, say $g(\text{income}) = 0.1 \times \text{income}$, then $L = 0.1$ and the same $\$5000$ gap creates a bias of $500$ units. Steep $g$ demands tighter matching.
+
+**You do NOT need to know the exact value of $L$.** The point is conceptual: the bias from matching depends on two things -- (1) how close the matches are and (2) how steeply the outcome depends on covariates. You control (1) through better matching. You can't control (2), but knowing it exists tells you *why* close matching matters.
+
+### Using the Lipschitz condition on the bias formula
+
+Since $|g(X_i) - g(X_{j(i)})| \le L \cdot |D_i|$ where $D_i = X_i - X_{j(i)}$ is the covariate gap in pair $i$:
+
+$$|\text{Bias}(\hat{\tau}^M)| \le L \cdot \frac{1}{n_M}\sum_{i=1}^{n_M}|D_i|$$
+
+Bias $\le$ (steepness of outcome function) $\times$ (average covariate gap in matched pairs).
+
+Make the average gap small by matching well, and the bias shrinks.
+
+## C.7 The Chebyshev Argument: From Matching Quality to Bias Bounds
+
+Now we need to figure out: how small is the average covariate gap $\frac{1}{n_M}\sum|D_i|$?
+
+### What Chebyshev's inequality says (in plain English)
+
+Chebyshev's inequality is a basic probability/statistics result that says:
+
+> If a bunch of numbers have a small variance, then most of them must be close to their average.
+
+Formally, for any collection of numbers $D_1, \ldots, D_{n_M}$ with mean $\mu_D$ and variance $s_D^2$:
+
+$$\text{fraction of } D_i \text{ that are more than } t \text{ away from the mean} \le \frac{s_D^2}{t^2}$$
+
+This requires **zero assumptions** about the shape of the distribution. It works for any data, always.
+
+### Applying it to matching
+
+The pairwise covariate differences $D_i = X_i - X_{j(i)}$ have:
+- Mean: $\mu_D = \Delta_X^M$ (the average covariate difference between matched groups)
+- Variance: $s_D^2$ (how spread out the pairwise gaps are)
+
+Chebyshev tells us: if $s_D^2$ is small, then most $D_i$ values are close to $\mu_D$. So the average absolute gap satisfies:
 
 $$\frac{1}{n_M}\sum|D_i| \le |\mu_D| + 2s_D$$
 
-So:
+(This comes from optimizing the Chebyshev bound -- don't worry about the derivation, just know the result.)
+
+### The final bias bound
+
+Plugging this into the Lipschitz bound:
 
 $$|\text{Bias}(\hat{\tau}^M)| \le L\big(|\Delta_X^M| + 2s_D\big)$$
 
-**In plain English:** If the matched pairs are close in their covariates (small $\Delta_X^M$ and small $s_D$), and the outcome function $g$ is reasonably smooth (bounded $L$), then the bias from confounding is small.
+**Reading this formula in English:**
 
-**This mirrors Week 1:** Regression bias came from imbalance in $g(X)$. Matching reduces this imbalance by construction.
+$$\text{Bias} \le \underbrace{L}_{\substack{\text{how steeply outcome} \\ \text{depends on covariates}}} \times \Big(\underbrace{|\Delta_X^M|}_{\substack{\text{average covariate} \\ \text{gap between groups}}} + \underbrace{2s_D}_{\substack{\text{spread of} \\ \text{pairwise gaps}}}\Big)$$
 
-## C.6 Connection Between Chebyshev Bounds and Balance Measures
+To make bias small, you need:
+- **Small $|\Delta_X^M|$:** The average covariate difference between matched treated and control groups should be small. This is what SMDs measure.
+- **Small $s_D$:** The pairwise gaps shouldn't be all over the place -- you want consistently close matches, not a mix of great matches and terrible ones.
+- **$L$ you can't control** -- it's a property of nature. But everything in the parentheses is under your control through better matching.
 
-The Chebyshev bound tells you: if the **variance** of pairwise differences $s_D^2$ is small, then only a small fraction of pairs can have large imbalances.
+### The connection to everything else
 
-$$\frac{1}{n_M}|\{i : |D_i - \mu_D| \ge t\}| \le \frac{s_D^2}{t^2}$$
+This result ties the whole course together:
 
-This connects to SMDs: if the pairwise differences have small mean and variance, the SMD must be small. So SMD is a summary statistic that reflects the underlying pairwise balance created by matching.
+- **Week 1:** Regression bias came from imbalance in $g(X)$. Matching reduces this imbalance by construction.
+- **SMDs:** When you check $|\text{SMD}| < 0.1$, you are checking that $|\Delta_X^M|$ is small relative to the spread of $X$. Small SMD = small first term in the bias bound.
+- **Variance ratios and Love plots:** These check whether balance is consistent across all covariates and whether $s_D$ is small. If your Love plot shows all dots near zero after matching, you have small $|\Delta_X^M|$ across all variables.
+- **Chebyshev's inequality** is the mathematical backbone: it guarantees that small variance in pairwise gaps means most individual pairs are well-matched, not just the average.
+
+**Bottom line for the exam:** Good covariate balance (small SMDs, variance ratios near 1) implies small bias under mild smoothness assumptions. This is why we obsess over balance diagnostics -- they are directly checking the conditions that make the bias bound small.
 
 ---
 
@@ -388,20 +468,41 @@ Equivalently: regression adjustment is **post-randomization blocking**. Blocking
 
 # Quick Reference: Formulas You Should Know
 
-| Formula | What it is |
-|---------|-----------|
-| $\tau_i = Y_i(1) - Y_i(0)$ | Individual treatment effect |
-| $Y_i^{\text{obs}} = Z_i Y_i(1) + (1-Z_i)Y_i(0)$ | Observed outcome |
-| $\tau = \frac{1}{N}\sum[Y_i(1) - Y_i(0)]$ | Finite-pop ATE |
-| $\hat{\tau} = \bar{Y}_T - \bar{Y}_C$ | Difference-in-means estimator |
-| $\text{Var}(\hat{\tau}) = \frac{S_1^2}{n_1} + \frac{S_0^2}{n_0} - \frac{S_\tau^2}{N}$ | Neyman's exact variance |
-| $\widehat{\text{Var}}(\hat{\tau}) = \frac{s_1^2}{n_1} + \frac{s_0^2}{n_0}$ | Conservative variance estimator |
-| $H_0: Y_i(1) = Y_i(0) \; \forall i$ | Fisher's sharp null |
-| $p = \Pr(|T| \ge |T_{\text{obs}}| \mid H_0)$ | Randomization p-value |
-| $Y_i^{(\tau_0)} = Y_i^{\text{obs}} - Z_i \tau_0$ | Adjusted outcomes for testing $\tau = \tau_0$ |
-| $\mathcal{C}_{1-\alpha} = \{\tau_0 : p(\tau_0) > \alpha\}$ | Confidence set by inversion |
-| $\text{SMD}(X) = \frac{\bar{X}_T - \bar{X}_C}{\sqrt{(s_T^2 + s_C^2)/2}}$ | Standardized mean difference |
-| $|\text{Bias}(\hat{\tau}^M)| \le L(|\Delta_X^M| + 2s_D)$ | Matching bias bound |
+**Potential outcomes and treatment effects:**
+
+$$\tau_i = Y_i(1) - Y_i(0) \qquad \text{(individual treatment effect)}$$
+
+$$Y_i^{\text{obs}} = Z_i \, Y_i(1) + (1-Z_i) \, Y_i(0) \qquad \text{(observed outcome)}$$
+
+$$\tau = \frac{1}{N}\sum_{i=1}^{N}\big[Y_i(1) - Y_i(0)\big] \qquad \text{(finite-population ATE)}$$
+
+**Estimation:**
+
+$$\hat{\tau} = \bar{Y}_T - \bar{Y}_C \qquad \text{(difference-in-means estimator)}$$
+
+$$\text{Var}(\hat{\tau}) = \frac{S_1^2}{n_1} + \frac{S_0^2}{n_0} - \frac{S_\tau^2}{N} \qquad \text{(Neyman's exact variance)}$$
+
+$$\widehat{\text{Var}}(\hat{\tau}) = \frac{s_1^2}{n_1} + \frac{s_0^2}{n_0} \qquad \text{(conservative variance estimator)}$$
+
+$$\text{95\% CI:} \quad \hat{\tau} \pm 1.96\sqrt{\widehat{\text{Var}}(\hat{\tau})}$$
+
+**Fisher's testing framework:**
+
+$$H_0: Y_i(1) = Y_i(0) \;\; \forall \, i \qquad \text{(Fisher's sharp null)}$$
+
+$$p = \Pr\!\Big(\!\left|T\right| \ge \left|T_{\text{obs}}\right| \;\Big|\; H_0\Big) \qquad \text{(randomization p-value)}$$
+
+$$Y_i^{(\tau_0)} = Y_i^{\text{obs}} - Z_i \, \tau_0 \qquad \text{(adjusted outcomes for testing } \tau = \tau_0\text{)}$$
+
+$$\mathcal{C}_{1-\alpha} = \{\tau_0 : p(\tau_0) > \alpha\} \qquad \text{(confidence set by inversion)}$$
+
+**Balance and matching:**
+
+$$\text{SMD}(X) = \frac{\bar{X}_T - \bar{X}_C}{\sqrt{(s_T^2 + s_C^2)\,/\,2}} \qquad \text{(standardized mean difference)}$$
+
+$$\text{VR}(X) = \frac{\text{Var}(X_T)}{\text{Var}(X_C)} \qquad \text{(variance ratio; should be near 1)}$$
+
+$$\text{Bias}(\hat{\tau}^M) \le L\,\big(\left|\Delta_X^M\right| + 2\,s_D\big) \qquad \text{(matching bias bound)}$$
 
 ---
 
