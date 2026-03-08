@@ -110,9 +110,17 @@ An estimator is unbiased if, on average (across many hypothetical repetitions of
 
 How much the estimator bounces around from study to study. Low variance = precise, high variance = noisy. Even an unbiased estimator can be useless if the variance is huge.
 
+### Consistency (assumption)
+
+The observed outcome equals the potential outcome corresponding to the treatment actually received. In symbols: if $Z_i = 1$, then $Y_i^{\text{obs}} = Y_i(1)$. If $Z_i = 0$, then $Y_i^{\text{obs}} = Y_i(0)$. This seems obvious but it is doing real work -- it says there are no hidden versions of treatment that would change what $Y_i(1)$ means. (This is closely related to SUTVA.)
+
 ### Propensity Score
 
 The probability that a person gets treated, based on their background characteristics. If you are young, healthy, and wealthy, maybe you have a 70% chance of getting the treatment. That 70% is your propensity score. Formally: $e(X) = \Pr(Z = 1 \mid X)$.
+
+### Tower Property (Law of Iterated Expectations)
+
+A math rule that says: you can compute an overall average by first averaging within subgroups, then averaging across subgroups. In symbols: $\mathbb{E}[Y] = \mathbb{E}[\mathbb{E}[Y \mid X]]$. This comes up repeatedly in the identification proofs and in showing IPW is unbiased. Think of it as: "the average of the group averages is the overall average" (when you weight by group size).
 
 ---
 
@@ -133,6 +141,8 @@ If you just compare average income of college grads vs. non-grads, you get a mix
 The model is:
 
 $$Y = \tau Z + \beta^\top X + \varepsilon$$
+
+(The notation $\beta^\top X$ just means "a weighted combination of all your background characteristics." If $X$ has three variables -- age, income, education -- then $\beta^\top X = \beta_1 \cdot \text{age} + \beta_2 \cdot \text{income} + \beta_3 \cdot \text{education}$. The $\beta$'s are the weights that regression figures out.)
 
 In plain English:
 
@@ -247,7 +257,7 @@ When you randomly assign treatment:
 
 **Setup:** You have $N$ people. You randomly pick $n_1$ of them to get the treatment. The remaining $n_0 = N - n_1$ are the control group.
 
-Every possible way of choosing $n_1$ people out of $N$ is equally likely. There are $\binom{N}{n_1}$ possible assignments, and each has the same probability:
+Every possible way of choosing $n_1$ people out of $N$ is equally likely. There are $\binom{N}{n_1}$ possible assignments (read "N choose n_1" -- this is the number of ways to pick $n_1$ items from $N$ total; for example, $\binom{10}{3} = 120$ means there are 120 ways to pick 3 people out of 10), and each has the same probability:
 
 $$\Pr(\mathbf{Z} = \mathbf{z}) = \binom{N}{n_1}^{-1}$$
 
@@ -293,7 +303,7 @@ Hoeffding's inequality says the probability of a big imbalance drops exponential
 
 $$\Pr\left(|\bar{X}_T - \bar{X}_C| > \epsilon\right) \le 2\exp\left(-\frac{2n_1 n_0}{N} \cdot \frac{\epsilon^2}{(b-a)^2}\right)$$
 
-Translation: in large experiments, big accidental imbalances are astronomically unlikely.
+where $(b-a)$ is the range of the covariate (max minus min) and $\epsilon$ is how much imbalance you are worried about. You do not need to memorize this formula. The takeaway: in large experiments, big accidental imbalances are astronomically unlikely. The larger the sample, the better the balance.
 
 ## 4.4 Regression vs. Randomization Comparison
 
@@ -494,7 +504,7 @@ $$Y_i(1) = Y_i(0) + \tau \quad \text{for all } i$$
 
 Then $\tau_i = \tau$ for everyone, so there is zero variation in treatment effects, and $S_\tau^2 = 0$. The $-S_\tau^2/N$ term vanishes and the conservative estimator equals the exact variance.
 
-**Also note from the identity:** $S_\tau^2 = S_1^2 + S_0^2 - 2S_{10}$. If effects are constant, $Y_i(1) = Y_i(0) + \tau$, which means $Y_i(1)$ and $Y_i(0)$ are perfectly linearly related, so $S_{10} = S_0^2 = S_1^2$ (well, $S_{10} = S_0 \cdot S_1 \cdot 1$ since correlation is 1). In that case $S_\tau^2 = 0$.
+**Check it with the identity:** If effects are constant ($Y_i(1) = Y_i(0) + \tau$ for all $i$), then adding a constant to every value doesn't change the spread, so $S_1^2 = S_0^2$. Also, since $Y_i(1)$ moves in perfect lockstep with $Y_i(0)$, their covariance equals their variance: $S_{10} = S_1^2 = S_0^2$. Plug into the identity: $S_\tau^2 = S_1^2 + S_0^2 - 2S_{10} = S_1^2 + S_1^2 - 2S_1^2 = 0$. Confirmed.
 
 ### The 95% Confidence Interval -- WHY It Covers 95%
 
@@ -601,7 +611,7 @@ Here is the beautiful idea. Under the sharp null:
 
 ### Randomization tests are NOT the same as permutation tests
 
-They look similar computationally, but the logic is different. Permutation tests assume the data are exchangeable (a distributional assumption). Randomization tests rely on the physical act of randomization. The randomization test is valid even if outcomes are weird (skewed, heavy-tailed, etc.).
+They look identical computationally (both shuffle labels and recompute statistics), but the **justification** is different. A permutation test assumes the data are exchangeable (a distributional assumption -- "the labels don't matter"). A randomization test relies on the fact that you **actually randomized** the treatment assignment. The randomization test is valid because randomization physically happened, regardless of whether outcomes are normal, skewed, heavy-tailed, or whatever. If you didn't randomize (observational study), you can't do a randomization test.
 
 ## 5.8 Constant Additive Treatment Effects
 
@@ -617,7 +627,11 @@ Want to test $H_0: \tau = \tau_0$ (the treatment effect is exactly $\tau_0$)?
 
 Create adjusted outcomes: $Y_i^{(\tau_0)} = Y_i^{\text{obs}} - Z_i \cdot \tau_0$
 
-If $\tau = \tau_0$, then $Y_i^{(\tau_0)} = Y_i(0)$ for everyone, and the adjusted data satisfy Fisher's sharp null. So run the randomization test on the adjusted data.
+**Why this works (follow the algebra for both cases):**
+- If person $i$ is treated ($Z_i = 1$): $Y_i^{(\tau_0)} = Y_i(1) - \tau_0$. If the true effect is $\tau_0$, then $Y_i(1) = Y_i(0) + \tau_0$, so $Y_i^{(\tau_0)} = Y_i(0) + \tau_0 - \tau_0 = Y_i(0)$.
+- If person $i$ is control ($Z_i = 0$): $Y_i^{(\tau_0)} = Y_i(0) - 0 = Y_i(0)$.
+
+So if $\tau = \tau_0$, then $Y_i^{(\tau_0)} = Y_i(0)$ for EVERYONE -- treated and control alike. That means the adjusted data satisfy Fisher's sharp null (treatment has no effect on the adjusted outcomes). So run the randomization test on the adjusted data.
 
 ### Confidence Intervals by Inversion
 
@@ -892,7 +906,7 @@ $$\tau = \mathbb{E}\Big[\mathbb{E}[Y \mid Z=1, X] - \mathbb{E}[Y \mid Z=0, X]\Bi
 
 1. $\mathbb{E}[Y(1)] = \mathbb{E}\big[\mathbb{E}[Y(1) \mid X]\big]$ -- (law of iterated expectations / tower property: you can compute an overall average by first averaging within groups of $X$, then averaging over groups)
 2. $= \mathbb{E}\big[\mathbb{E}[Y(1) \mid Z=1, X]\big]$ -- (by ignorability: conditional on $X$, the potential outcome under treatment is the same regardless of whether the person was actually treated)
-3. $= \mathbb{E}\big[\mathbb{E}[Y \mid Z=1, X]\big]$ -- (by consistency: for treated people, $Y = Y(1)$, so the observed outcome IS the potential outcome under treatment)
+3. $= \mathbb{E}\big[\mathbb{E}[Y \mid Z=1, X]\big]$ -- (by consistency: for treated people, their observed outcome $Y$ equals $Y(1)$, so you can swap in the observable quantity; overlap ensures there ARE treated people for every value of $X$)
 
 Same logic gives $\mathbb{E}[Y(0)] = \mathbb{E}\big[\mathbb{E}[Y \mid Z=0, X]\big]$.
 
@@ -1060,11 +1074,11 @@ Consider the treated piece:
 
 $$\mathbb{E}\left[\frac{Z_i Y_i}{e(X_i)}\right]$$
 
-Using the tower property (condition on $X_i$ first):
+Using the tower property (first average within subgroups defined by $X_i$, then average across subgroups -- see Vocabulary section):
 
 $$= \mathbb{E}\left[\mathbb{E}\left[\frac{Z_i Y_i}{e(X_i)} \,\Big|\, X_i\right]\right]$$
 
-Given $X_i$, the propensity score $e(X_i)$ is just a number, and by ignorability, $Y_i(1)$ is independent of $Z_i$ given $X_i$. Also, when $Z_i = 1$, we observe $Y_i = Y_i(1)$. So:
+Now work out the inner expectation. Given $X_i$, the propensity score $e(X_i)$ is just a fixed number (not random). By ignorability, $Y_i(1)$ is independent of $Z_i$ given $X_i$. And when $Z_i = 1$, we observe $Y_i = Y_i(1)$ (by consistency). So we can separate $Z_i$ from $Y_i(1)$:
 
 $$= \mathbb{E}\left[\frac{\mathbb{E}[Z_i \mid X_i] \cdot \mathbb{E}[Y_i(1) \mid X_i]}{e(X_i)}\right] = \mathbb{E}\left[\frac{e(X_i) \cdot \mathbb{E}[Y_i(1) \mid X_i]}{e(X_i)}\right] = \mathbb{E}[\mathbb{E}[Y_i(1) \mid X_i]] = \mathbb{E}[Y_i(1)]$$
 
