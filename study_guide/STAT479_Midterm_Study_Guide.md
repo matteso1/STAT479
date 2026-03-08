@@ -202,9 +202,21 @@ $$\text{Bias} = \frac{\sum_{i=1}^{n} \tilde{Z}_i \, g(X_i)}{\sum_{i=1}^{n} \tild
 
 where $g(X)$ is the nonlinear part you left out.
 
-**Takeaway:** Regression only balances what you put into the model. If you miss something (a nonlinear relationship, an interaction, or -- worst of all -- an unobserved confounder), the estimate of $\tau$ will be biased.
+**Concrete example of misspecification:** Suppose income ($Y$) depends on education ($X$) in a curvy way: people with very high education earn *much* more (the curve bends upward). You run a linear regression of $Y$ on treatment $Z$ and education $X$. The regression perfectly balances education: the weighted average education is the same in both groups. But it does NOT balance $X^2$ (education squared). If treated people happen to have more extreme education values (some very high, some very low), then $\sum w_i X_i^2 \neq 0$, and the curvy relationship between education and income bleeds into your treatment effect estimate.
 
-## 3.6 Key Limitations Summary
+## 3.6 The Extrapolation Problem
+
+This is a separate failure mode that the practice problems emphasize.
+
+**What it is:** If treated and control groups occupy different regions of the covariate space, regression is forced to **extrapolate** -- it uses the fitted line to predict what would happen in a region where you have no data.
+
+**Example:** Suppose all treated people have income > \$80K and all control people have income < \$40K. There is a huge gap in the middle. Regression fits a line through the treated data and another through the control data, then uses those lines to "fill in" the gap. But if the true relationship is nonlinear in that gap, the extrapolation can be wildly wrong.
+
+**Why this matters:** Regression gives you a number no matter what. It does not warn you that it is extrapolating. You have to check the overlap of the covariate distributions yourself. This connects directly to the **overlap assumption** in observational studies (Week 6).
+
+**How to detect it:** Look at the distributions of covariates in the treated and control groups. If they barely overlap, regression is extrapolating. Love plots and histograms help.
+
+## 3.7 Key Limitations Summary
 
 Regression assumes:
 - **Linearity:** the relationship between background and outcome is a straight line
@@ -360,7 +372,7 @@ In plain English: take the average outcome of the treated people, subtract the a
 
 ## 5.6 Neyman's Framework -- The Estimation Approach
 
-Jerzy Neyman developed a framework focused on **estimating** the average treatment effect and quantifying uncertainty.
+Jerzy Neyman developed a framework focused on **estimating** the average treatment effect and quantifying uncertainty. This is one of the most important sections for the exam -- you need to understand not just the formulas, but **why** they work.
 
 ### Unbiasedness
 
@@ -370,17 +382,44 @@ $$\mathbb{E}[\hat{\tau}] = \tau$$
 
 **Translation:** If you could repeat the experiment many times (re-randomizing each time), the average of all your estimates would be the true treatment effect. The estimator is not systematically off in any direction.
 
-**Why?** Because randomization makes each person equally likely to be in the treated group. So the treated group mean is an unbiased estimate of $\bar{Y}(1)$ (the average outcome if everyone were treated), and the control group mean is an unbiased estimate of $\bar{Y}(0)$.
+**Why does this work? Walk through it with a concrete example.**
 
-No modeling assumptions needed. Unbiasedness follows purely from the randomization.
+Suppose you have 6 people. Their potential outcomes are:
+
+| Person | $Y_i(1)$ | $Y_i(0)$ | $\tau_i$ |
+|--------|----------|----------|----------|
+| Alice | 8 | 5 | 3 |
+| Bob | 6 | 4 | 2 |
+| Carol | 10 | 6 | 4 |
+| Dave | 4 | 3 | 1 |
+| Eve | 7 | 5 | 2 |
+| Frank | 9 | 7 | 2 |
+
+True ATE: $\tau = (3+2+4+1+2+2)/6 = 14/6 \approx 2.33$.
+
+Now randomly assign 3 to treatment. One possible randomization: Alice, Carol, Eve get treated. You observe:
+- Treated outcomes: 8, 10, 7. Mean = 8.33
+- Control outcomes: 4, 3, 7. Mean = 4.67
+- $\hat{\tau} = 8.33 - 4.67 = 3.67$ (too high this time)
+
+Another randomization: Bob, Dave, Frank get treated. You observe:
+- Treated outcomes: 6, 4, 9. Mean = 6.33
+- Control outcomes: 5, 6, 5. Mean = 5.33
+- $\hat{\tau} = 6.33 - 5.33 = 1.00$ (too low this time)
+
+Each individual estimate can be too high or too low. But if you averaged $\hat{\tau}$ across ALL $\binom{6}{3} = 20$ possible randomizations, you would get exactly $\tau = 2.33$. That is what unbiasedness means.
+
+**The mechanism:** Randomization makes each person equally likely to be in the treated group. So the treated group mean is an unbiased estimate of $\bar{Y}(1)$ (the average of ALL treated potential outcomes), and the control group mean is an unbiased estimate of $\bar{Y}(0)$. No modeling assumptions needed.
 
 ### How much does the estimate bounce around? (Neyman's Exact Variance)
 
-First, some building blocks. Define these **finite-population variances** (these just measure how spread out the potential outcomes are):
+We just saw that $\hat{\tau}$ bounces around from randomization to randomization. Neyman's variance formula tells you **how much** it bounces.
+
+First, some building blocks. Define these **finite-population variances** (these just measure how spread out the potential outcomes are across ALL $N$ people):
 
 $$S_1^2 = \frac{1}{N-1}\sum_{i=1}^{N}\big(Y_i(1) - \bar{Y}(1)\big)^2$$
 
-This measures how spread out the treated potential outcomes are.
+This measures how spread out the treated potential outcomes are. If everyone would respond similarly to treatment, $S_1^2$ is small.
 
 $$S_0^2 = \frac{1}{N-1}\sum_{i=1}^{N}\big(Y_i(0) - \bar{Y}(0)\big)^2$$
 
@@ -388,50 +427,130 @@ Same thing for control potential outcomes.
 
 $$S_\tau^2 = \frac{1}{N-1}\sum_{i=1}^{N}(\tau_i - \tau)^2$$
 
-This measures how much the treatment effect **varies across people**. If the treatment helps everyone by exactly the same amount, this is zero. If some people benefit a lot and others not at all, this is large.
+This measures how much the treatment effect **varies across people**. Think of it this way:
+- If a drug lowers blood pressure by exactly 10 points for everyone: $S_\tau^2 = 0$ (constant effect)
+- If the drug lowers blood pressure by 20 for some people and does nothing for others: $S_\tau^2$ is large (heterogeneous effects)
 
 **Neyman's exact variance formula:**
 
 $$\text{Var}(\hat{\tau}) = \frac{S_1^2}{n_1} + \frac{S_0^2}{n_0} - \frac{S_\tau^2}{N}$$
 
-In English:
-- More spread in the potential outcomes ($S_1^2$, $S_0^2$) means more variance (noisier estimate)
-- Larger groups ($n_1$, $n_0$) means less variance (more precise)
-- More heterogeneous treatment effects ($S_\tau^2$) actually **decreases** variance (this is the subtle part)
+**Read it in pieces:**
+- $S_1^2 / n_1$: Sampling $n_1$ people from the population for the treated group introduces noise proportional to how spread out treated outcomes are, divided by the group size. More people in the group = less noise.
+- $S_0^2 / n_0$: Same logic for the control group.
+- $-S_\tau^2 / N$: This is the subtle part. When treatment effects vary a lot ($S_\tau^2$ large), the variance is actually *smaller*. Why? Because heterogeneous effects create a negative correlation between $\bar{Y}_T$ and $\bar{Y}_C$. When the high-$\tau$ people happen to land in the treated group, they push $\bar{Y}_T$ up but their absence from the control group also pushes $\bar{Y}_C$ down. The difference $\hat{\tau} = \bar{Y}_T - \bar{Y}_C$ doesn't move as much as each piece does individually.
 
-### The problem with $S_\tau^2$
+### The problem with $S_\tau^2$ (and $S_{10}$)
 
-$S_\tau^2$ requires knowing both $Y_i(1)$ and $Y_i(0)$ for every person -- which we never have. So we can't compute the exact variance.
+Here is the critical issue that drives the entire conservative approach.
 
-### The conservative workaround
+$S_\tau^2$ requires knowing $\tau_i = Y_i(1) - Y_i(0)$ for every person -- which requires seeing **both** potential outcomes. We never have that.
 
-Since $S_\tau^2 \ge 0$, we know:
+**There is an algebraic identity that makes this even clearer:**
 
-$$\text{Var}(\hat{\tau}) \le \frac{S_1^2}{n_1} + \frac{S_0^2}{n_0}$$
+$$S_\tau^2 = S_1^2 + S_0^2 - 2S_{10}$$
 
-We can estimate $S_1^2$ and $S_0^2$ using the sample variances from the observed data:
+where $S_{10} = \frac{1}{N-1}\sum_{i=1}^{N}\big(Y_i(1) - \bar{Y}(1)\big)\big(Y_i(0) - \bar{Y}(0)\big)$ is the **covariance** between treated and control potential outcomes.
+
+**Why $S_{10}$ is unidentifiable:** To compute $S_{10}$, you need to know $Y_i(1)$ AND $Y_i(0)$ for the same person. But you only ever see one. You see $Y_i(1)$ for the treated people and $Y_i(0)$ for the control people -- never both for the same person. So $S_{10}$ is forever unknown.
+
+**Concrete example:** Suppose a study drug helps sick people more than healthy people. Then people with high $Y_i(0)$ (healthy, high baseline) would have lower $\tau_i$, meaning $Y_i(1)$ and $Y_i(0)$ move together -- $S_{10}$ would be large and positive. But you can never verify this from the data because you never see both outcomes for the same person.
+
+Since $S_{10}$ is unidentifiable, and $S_\tau^2 = S_1^2 + S_0^2 - 2S_{10}$ contains $S_{10}$, we cannot compute $S_\tau^2$ either.
+
+### The conservative workaround -- and WHY it is ALWAYS valid
+
+Here is the chain of logic. Follow each step carefully:
+
+**Step 1:** $S_\tau^2$ is a variance. Variances are sums of squared deviations. Squares are always non-negative. Therefore:
+
+$$S_\tau^2 = \frac{1}{N-1}\sum_{i=1}^{N}(\tau_i - \tau)^2 \ge 0$$
+
+This is **universally true**. It does not matter what the treatment is, what the population looks like, or whether effects are constant or wildly heterogeneous. A sum of squares is never negative. Period.
+
+**Step 2:** Since $S_\tau^2 \ge 0$, the term $-S_\tau^2/N$ in the exact variance is always $\le 0$. So:
+
+$$\text{Var}(\hat{\tau}) = \frac{S_1^2}{n_1} + \frac{S_0^2}{n_0} - \underbrace{\frac{S_\tau^2}{N}}_{\ge 0} \le \frac{S_1^2}{n_1} + \frac{S_0^2}{n_0}$$
+
+The true variance is always **at most** $S_1^2/n_1 + S_0^2/n_0$.
+
+**Step 3:** We CAN estimate $S_1^2$ and $S_0^2$ from the data. For $S_1^2$: among the $n_1$ treated people we observe, compute their sample variance. This is an unbiased estimator of $S_1^2$ (by the same randomization logic -- the treated people are a random sample from the population).
 
 $$s_1^2 = \frac{1}{n_1-1}\sum_{i:Z_i=1}(Y_i^{\text{obs}} - \bar{Y}_T)^2, \quad s_0^2 = \frac{1}{n_0-1}\sum_{i:Z_i=0}(Y_i^{\text{obs}} - \bar{Y}_C)^2$$
 
-**Neyman's conservative variance estimator:**
+**Step 4: Neyman's conservative variance estimator:**
 
 $$\widehat{\text{Var}}(\hat{\tau}) = \frac{s_1^2}{n_1} + \frac{s_0^2}{n_0}$$
 
-"Conservative" means it **overestimates** the true variance (because it ignores the $-S_\tau^2/N$ term). This means your confidence intervals will be a bit wider than they need to be, but they are still valid.
+This **overestimates** the true variance because it pretends $S_\tau^2 = 0$ (drops the $-S_\tau^2/N$ term). Since the dropped term was always negative (or zero), what remains is always bigger than (or equal to) the truth.
 
-### When is the conservative estimator exact?
+**In one sentence:** We are deliberately overestimating how noisy our estimate is. This makes our confidence intervals wider than they technically need to be, but they are never too narrow. They always cover at the advertised rate (or better).
 
-When the treatment effect is the **same for everyone**: $Y_i(1) = Y_i(0) + \tau$ for all $i$.
+### When is the conservative estimator exact? (When does equality hold?)
 
-Then $S_\tau^2 = 0$ (no variation in treatment effects), and the conservative bound equals the true variance.
+When $S_\tau^2 = 0$, meaning the treatment effect is **constant** -- the same for everyone:
 
-### Confidence Intervals
+$$Y_i(1) = Y_i(0) + \tau \quad \text{for all } i$$
 
-For large samples, the estimator is approximately normally distributed (by a central limit theorem that comes from the randomization, NOT from assuming outcomes are normal):
+Then $\tau_i = \tau$ for everyone, so there is zero variation in treatment effects, and $S_\tau^2 = 0$. The $-S_\tau^2/N$ term vanishes and the conservative estimator equals the exact variance.
 
-$$\hat{\tau} \pm z_{1-\alpha/2}\sqrt{\widehat{\text{Var}}(\hat{\tau})}$$
+**Also note from the identity:** $S_\tau^2 = S_1^2 + S_0^2 - 2S_{10}$. If effects are constant, $Y_i(1) = Y_i(0) + \tau$, which means $Y_i(1)$ and $Y_i(0)$ are perfectly linearly related, so $S_{10} = S_0^2 = S_1^2$ (well, $S_{10} = S_0 \cdot S_1 \cdot 1$ since correlation is 1). In that case $S_\tau^2 = 0$.
 
-For a 95% CI, $z_{0.975} \approx 1.96$, so this is roughly $\hat{\tau} \pm 1.96 \times \text{SE}$.
+### The 95% Confidence Interval -- WHY It Covers 95%
+
+This is the part you need to really understand. The CI formula is:
+
+$$\hat{\tau} \pm 1.96\sqrt{\widehat{\text{Var}}(\hat{\tau})}$$
+
+**But WHY does this cover the true $\tau$ at least 95% of the time?** There are three pieces to the argument, and each one does a specific job:
+
+---
+
+**PIECE 1: The Finite-Population CLT -- this is what CENTERS the distribution**
+
+The Central Limit Theorem for finite populations says that under complete randomization, as the sample size grows:
+
+$$\frac{\hat{\tau} - \tau}{\sqrt{\text{Var}(\hat{\tau})}} \xrightarrow{d} N(0,1)$$
+
+**What this says in plain English:** The distribution of $\hat{\tau}$ across all possible randomizations is approximately a bell curve (normal distribution) centered at $\tau$.
+
+**Why is it centered at $\tau$?** Because $\hat{\tau}$ is unbiased: $\mathbb{E}[\hat{\tau}] = \tau$. The CLT is what tells you the **shape** is a bell curve. Unbiasedness is what tells you the **center** of that bell curve is the true treatment effect.
+
+**Where does the randomness come from?** NOT from assuming outcomes are normally distributed. NOT from any model. The randomness comes purely from the **physical act of randomization** -- which $n_1$ people out of $N$ happen to get assigned to treatment. Different randomizations give different estimates, and the distribution of those estimates across all $\binom{N}{n_1}$ randomizations is approximately normal.
+
+**Analogy:** Imagine you have a jar of 100 marbles with numbers on them. You randomly grab 50. The average of your 50 will vary depending on which ones you happened to grab. If you did this many times, the histogram of averages would be bell-shaped. That is the CLT at work -- and it has nothing to do with the numbers on the marbles being "normal."
+
+---
+
+**PIECE 2: The standard error quantifies the WIDTH of that bell curve**
+
+The standard deviation of $\hat{\tau}$ (its standard error) tells you how wide the bell curve is. A narrow bell curve means $\hat{\tau}$ doesn't bounce around much; a wide one means it bounces a lot.
+
+The true SE is $\sqrt{\text{Var}(\hat{\tau})} = \sqrt{S_1^2/n_1 + S_0^2/n_0 - S_\tau^2/N}$.
+
+We estimate it with $\sqrt{s_1^2/n_1 + s_0^2/n_0}$, which is **too big** (because we dropped the $-S_\tau^2/N$ term). So we think the bell curve is wider than it actually is.
+
+---
+
+**PIECE 3: Putting it together -- why the CI covers AT LEAST 95%**
+
+For a standard normal distribution, 95% of the probability mass is within $\pm 1.96$ standard deviations of the center.
+
+So the interval $\hat{\tau} \pm 1.96 \times \text{true SE}$ would contain $\tau$ in approximately 95% of all randomizations. (This is the "exact 95%" part, from the CLT.)
+
+But we use $\hat{\tau} \pm 1.96 \times \text{estimated SE}$, and our estimated SE is **too big**. That means our interval is **wider** than the "exact 95%" interval. A wider interval catches the true value **more often** than 95%. So:
+
+$$\Pr(\tau \in \text{CI}) \ge 95\%$$
+
+The coverage is **at least** 95%. It might be 96% or 97% in practice, but it is never below 95%. This is what "conservative" means -- we err on the side of caution, and the coverage guarantee always holds.
+
+**Summary of the logic chain:**
+
+1. Randomization + unbiasedness centers $\hat{\tau}$ around $\tau$
+2. The finite-population CLT says the distribution is approximately bell-shaped (normal)
+3. For a normal distribution, $\pm 1.96$ SDs covers 95%
+4. We overestimate the SD (because $S_\tau^2 \ge 0$ always), so we get $\ge$ 95% coverage
+5. This works for ANY population, ANY treatment effect distribution -- because $S_\tau^2 \ge 0$ is a mathematical fact, not an assumption
 
 ### Neyman vs. the classical two-sample t-test
 
@@ -644,17 +763,50 @@ A visual tool. Plot SMDs before and after matching for each covariate. You want 
 
 Under a model where $Y_i = \tau Z_i + g(X_i) + \varepsilon_i$ (outcome depends on treatment plus some function of covariates plus noise):
 
-If you match each treated person $i$ to a control person $j(i)$ with similar covariates, the bias is:
+If you match each treated person $i$ to a control person $j(i)$ with similar covariates, the bias of the matched estimator is:
 
 $$\text{Bias} = \frac{1}{n_M}\sum_{i=1}^{n_M}\big(g(X_i) - g(X_{j(i)})\big)$$
 
-If $g$ is smooth (doesn't jump around wildly) and the matched pairs have similar covariates ($X_i \approx X_{j(i)}$), then each term $g(X_i) - g(X_{j(i)})$ is small, so the bias is small.
+**The intuition:** Each pair contributes $g(X_i) - g(X_{j(i)})$ to the bias. If the matched pair has similar covariates ($X_i \approx X_{j(i)}$), and the outcome function $g$ is smooth (doesn't jump around wildly), then $g(X_i) \approx g(X_{j(i)})$ and the bias from that pair is tiny. Sum up a bunch of tiny biases and the total bias is small.
 
-**Bottom line:** Better matching (more similar pairs) = less bias. This is formalized by Chebyshev-type bounds:
+**Example:** Suppose $g(X) = X^2$ and you match a treated person with income $X_i = 50K$ to a control person with $X_{j(i)} = 48K$. The bias contribution is $50^2 - 48^2 = 2500 - 2304 = 196$. If instead you matched them to someone with $X_{j(i)} = 30K$, the bias would be $50^2 - 30^2 = 2500 - 900 = 1600$. Close matches matter.
+
+### The Chebyshev-type bias bound
+
+This formalizes "better matching = less bias":
 
 $$|\text{Bias}| \le L\big(|\Delta_X^M| + 2s_D\big)$$
 
-where $L$ measures how "curvy" $g$ is, $\Delta_X^M$ is the average covariate difference in matched pairs, and $s_D$ is the standard deviation of pairwise differences. Shrink these, and the bias shrinks.
+where:
+- $L$ = the **Lipschitz constant** of $g$. This is the maximum steepness of the outcome function. If $g$ changes by at most $L$ units when $X$ changes by 1 unit, then $L$ is the Lipschitz constant. Steeper functions (larger $L$) = more bias potential.
+- $\Delta_X^M$ = the **average covariate difference** in matched pairs. If the average matched pair has a covariate gap of 0.1, this term is small.
+- $s_D$ = the **standard deviation** of pairwise covariate differences. Even if the average gap is small, if some pairs are well-matched and others are badly matched, $s_D$ will be large and the bound gets worse.
+
+**What this bound tells you practically:** You control the bias by making all three terms small. You cannot control $L$ (that is a property of nature -- how curvy the outcome function is). But you CAN control $\Delta_X^M$ and $s_D$ by matching better.
+
+## 7.6 Exact Balance vs. Near-Fine Balance
+
+These are different standards for what matching achieves:
+
+**Exact balance:** The distribution of a covariate is **identical** in the treated and matched control groups. For example, if 40% of treated people are female, exactly 40% of matched controls are female. This is the gold standard but hard to achieve for many covariates simultaneously.
+
+**Near-fine balance:** The distributions are **approximately** equal. The SMD is small (say < 0.1) but not exactly zero. In practice, this is what you usually get and it is good enough, because the bias bound depends on how close matches are, and near-fine balance means the matches are close.
+
+**Why the distinction matters:** Some covariates (like gender or race) can be exactly balanced because they are categorical with few levels. Continuous covariates (like age or income) will almost never be exactly balanced -- you settle for near-fine balance.
+
+## 7.7 Mahalanobis Distance and the Curse of Dimensionality
+
+**Mahalanobis distance** accounts for the fact that covariates may have different scales and be correlated:
+
+$$d_M(X_i, X_j) = \sqrt{(X_i - X_j)^\top \hat{\Sigma}^{-1} (X_i - X_j)}$$
+
+where $\hat{\Sigma}$ is the sample covariance matrix of the covariates.
+
+**Why not just use Euclidean distance?** If age is in years (range 20-80) and income is in dollars (range 20K-200K), Euclidean distance would be dominated by income because its scale is much larger. Mahalanobis distance normalizes by the covariance matrix, putting all covariates on equal footing.
+
+**The curse of dimensionality:** As the number of covariates grows, Mahalanobis distance matching gets worse. In high dimensions, all points are roughly equally far apart, so "nearest neighbor" matches are not actually close. This is why the propensity score (which collapses everything to one dimension) becomes essential in high-dimensional settings.
+
+**A common hybrid approach:** Use Mahalanobis distance matching on a few key covariates, with a **propensity score caliper** -- only allow matches where the propensity scores are within some threshold (e.g., 0.2 standard deviations). This combines the strengths of both approaches.
 
 ---
 
@@ -718,7 +870,11 @@ $$0 < \Pr(Z = 1 \mid X = x) < 1 \quad \text{for all } x$$
 
 **Why it matters:** If all 30-year-old women always get the treatment and never end up in control, there are no control people to compare them to. You'd have to **extrapolate** (guess what their control outcome would be), which is unreliable.
 
-**When it fails:** If there are regions of covariate space where you only see treated people or only see control people, you cannot estimate the treatment effect there. Solutions include trimming the sample to the region of overlap.
+**When it fails:** If there are regions of covariate space where you only see treated people or only see control people, you cannot estimate the treatment effect there.
+
+**Concrete example of overlap failure:** Suppose you are studying the effect of a prestigious MBA program on salary. Everyone with GPA > 3.8 gets accepted (treated), and nobody with GPA < 3.0 even applies. In the 3.0-3.8 range, some people apply and some don't. You can estimate the treatment effect in the 3.0-3.8 range (where you see both treated and untreated), but you CANNOT estimate it for GPA > 3.8 (no controls to compare to) or GPA < 3.0 (no treated people). Any estimate for those regions is pure extrapolation.
+
+**What to do about it:** Trim the sample to the region of overlap. Drop units with propensity scores below 0.1 or above 0.9 (or whatever threshold makes the overlap plot look reasonable). This changes the estimand -- you are now estimating the treatment effect for the **overlapping subpopulation**, not the entire population. That is a weaker but more honest claim.
 
 ### Assumption 3: SUTVA
 
@@ -792,6 +948,10 @@ You can also use more flexible methods (random forests, boosting, etc.).
 
 **Important:** The goal is NOT to predict treatment assignment as accurately as possible. The goal is to get good **covariate balance** after matching or weighting. A model that predicts well but produces poor balance is useless.
 
+**How to interpret propensity score model coefficients:** If you fit a logistic regression $\text{logit}(e(X)) = \alpha + \beta_1 \cdot \text{age} + \beta_2 \cdot \text{male} + \ldots$, the coefficients tell you what **predicts treatment selection**, not what affects the outcome. A large positive $\beta_1$ means older people are more likely to be treated. This has nothing to do with whether age affects the outcome -- it only describes the treatment selection process.
+
+**Common mistake:** Including too many covariates can actually hurt. If you include a covariate that perfectly predicts treatment (e.g., a covariate that is 1 for all treated and 0 for all control), the estimated propensity scores will be 0 or 1, violating overlap. Include confounders (things that affect BOTH treatment and outcome), but be careful about including "instruments" (things that affect treatment but not outcomes) -- they increase variance without reducing bias.
+
 **After estimating, always check:**
 - **Overlap:** Plot histograms of the estimated propensity scores for treated vs. control. They should overlap substantially. If they don't, you have a common support problem.
 - **Balance:** Compute SMDs after matching/weighting on the propensity score. If covariates are still imbalanced, the propensity score model needs improvement.
@@ -817,6 +977,12 @@ A critical idea throughout this course is separating the **design phase** from t
 **Analysis phase:** Only after you have achieved good balance, plug in the outcomes and estimate the treatment effect. At this point, you can use simple methods (like difference in means within matched pairs, or weighted means).
 
 **Why separate?** Because if you look at outcomes first, you might (consciously or not) choose the method that gives you the answer you want. By committing to a design before seeing outcomes, you protect yourself from this bias. This mirrors how clinical trials work: the analysis plan is locked in before unblinding the data.
+
+**Analogy:** It is like a referee reviewing a play in football. They decide the rules and review process before the play happens. If they waited until after seeing the play to decide what counts as a foul, every call would be suspect. Same logic here: decide your comparison method, check that the groups are balanced, and THEN look at what happened.
+
+**What counts as the design phase:** Estimating propensity scores, running matching, checking SMDs, making Love plots, checking overlap -- all of this uses ONLY the covariates $X$ and the treatment indicator $Z$. The outcome $Y$ is not touched.
+
+**What counts as the analysis phase:** Computing $\hat{\tau}$ (whether via matched difference-in-means, IPW, AIPW, etc.), building confidence intervals, running hypothesis tests. This is where $Y$ enters.
 
 ## 9.2 Matching on Covariates vs. Matching on the Propensity Score
 
@@ -857,13 +1023,24 @@ $$\hat{\tau}_{\text{strat}} = \sum_{k=1}^{K} \frac{N_k}{N} \left(\bar{Y}_{T,k} -
 
 This is a fundamentally different approach from matching. Instead of finding similar people, IPW **reweights** every person in the sample so that the weighted groups look like a randomized experiment.
 
-### The intuition
+### The intuition -- a concrete example
 
-Imagine a treated person with a propensity score of $e(X) = 0.2$. Only 20% of people like them get treated. So this one treated person "represents" $1/0.2 = 5$ people in the population. We should upweight them.
+Imagine you are studying the effect of a job training program on wages. You have two types of people: college-educated and non-college-educated.
 
-Conversely, a treated person with $e(X) = 0.9$ is very typical of the treated group -- 90% of people like them get treated. They only represent $1/0.9 \approx 1.1$ people. We give them a small weight.
+- Among college-educated people: 80% enroll in training ($e(X) = 0.8$)
+- Among non-college-educated people: 20% enroll in training ($e(X) = 0.2$)
 
-The same logic applies to the control group: a control person with $e(X) = 0.8$ (meaning 80% of similar people get treated, so only 20% end up in control) should be upweighted by $1/(1-0.8) = 5$.
+If you just look at the treated group, it is 80% college-educated and 20% non-college. That does NOT look like the overall population (which might be 50/50). The treated group is skewed toward college-educated people.
+
+**IPW fixes this by reweighting:**
+- A treated college person gets weight $1/0.8 = 1.25$ (they are "over-represented" among the treated, so downweight slightly)
+- A treated non-college person gets weight $1/0.2 = 5$ (they are "rare" among treated, so upweight a lot -- this one person represents 5 similar people who mostly did NOT get treated)
+- A control non-college person gets weight $1/(1-0.2) = 1.25$
+- A control college person gets weight $1/(1-0.8) = 5$
+
+After reweighting, both groups look like the overall population. The weighted treated group is 50/50 college/non-college. The weighted control group is also 50/50. Now the comparison is apples-to-apples.
+
+**General principle:** A treated person with $e(X) = 0.2$ (only 20% of people like them get treated) gets weight $1/0.2 = 5$. They "stand in for" all the similar people who didn't get treated. A treated person with $e(X) = 0.9$ only gets weight $1/0.9 \approx 1.1$ because most people like them get treated anyway -- they don't need to represent many missing people.
 
 ### The IPW estimator
 
@@ -955,11 +1132,14 @@ where:
 
 Think of AIPW in two pieces:
 
-**Piece 1:** Start with the regression-based estimate: $\hat{\mu}_1(X_i) - \hat{\mu}_0(X_i)$. This is the predicted treatment effect for person $i$ based on their covariates.
+**Piece 1:** Start with the regression-based estimate: $\hat{\mu}_1(X_i) - \hat{\mu}_0(X_i)$. This is the predicted treatment effect for person $i$ based on their covariates. "If I trust my outcome regression completely, this is my best guess."
 
-**Piece 2:** Add a correction term that uses IPW to fix any errors in the regression. The term $Y_i - \hat{\mu}_1(X_i)$ is the **residual** -- how far the actual outcome is from what the regression predicted. The IPW weights make sure these residuals are properly averaged.
+**Piece 2:** Add a correction term that uses IPW to fix any errors in the regression. The term $Y_i - \hat{\mu}_1(X_i)$ is the **residual** -- how far the actual outcome is from what the regression predicted. The IPW weights make sure these residuals are properly averaged across covariate groups.
 
-If the regression is perfect ($Y_i = \hat{\mu}_1(X_i)$ for treated, $Y_i = \hat{\mu}_0(X_i)$ for control), the correction terms are zero and you just get the regression estimate. If the regression is wrong, the IPW correction fixes it (as long as the propensity score is correct).
+**The beautiful self-correcting mechanism:**
+- If the regression is perfect ($Y_i \approx \hat{\mu}_1(X_i)$ for treated), the residuals are near zero, the IPW correction vanishes, and AIPW just returns the regression estimate. The propensity score doesn't even matter.
+- If the regression is terrible but the propensity score is correct, the residuals are large but the IPW weights properly re-average them to get the right answer. The regression's predictions wash out.
+- If both are pretty good (but not perfect), you get a better answer than either method alone, because the regression handles the "smooth" part and IPW handles the "reweighting" part.
 
 ### The "doubly robust" property
 
@@ -969,6 +1149,10 @@ AIPW is consistent (gives the right answer in large samples) if **either:**
 2. The propensity score model is correctly specified ($\hat{e}$ is correct)
 
 You only need **one** of the two models to be right, not both. This is why it is called "doubly robust" -- you get two shots at getting it right.
+
+**Why "doubly robust" and not just "more robust":** The mathematical structure guarantees that when one model is correct, the errors from the other model get multiplied by something that converges to zero. It is not just "kind of robust" -- it is a formal guarantee.
+
+**Concrete scenario:** Suppose you are estimating the effect of a new teaching method on test scores. You model the outcome as a linear function of GPA ($\hat{\mu}$), and you model the propensity to adopt the new method as a logistic function of GPA ($\hat{e}$). Even if the true outcome-GPA relationship is nonlinear (so your outcome regression is wrong), as long as the propensity model is right, AIPW still nails it. OR, even if the propensity model is wrong (maybe the adoption decision also depends on teacher enthusiasm, which you missed), as long as the outcome regression correctly predicts scores from GPA, AIPW still nails it. You only fail if BOTH models are wrong.
 
 **Important caveat:** If both models are wrong, AIPW can also give the wrong answer. Double robustness is not a free lunch -- it just gives you better odds.
 
@@ -1061,7 +1245,7 @@ $$\text{Var}(\hat{\tau}) = \frac{S_1^2}{n_1} + \frac{S_0^2}{n_0} - \frac{S_\tau^
 **Neyman's variance estimator (what you compute in practice):**
 $$\widehat{\text{Var}}(\hat{\tau}) = \frac{s_1^2}{n_1} + \frac{s_0^2}{n_0}$$
 
-**Relationship between variances:** $S_\tau^2 = S_1^2 + S_0^2 - 2S_{10}$
+**Relationship between variances (KEY identity):** $S_\tau^2 = S_1^2 + S_0^2 - 2S_{10}$, where $S_{10}$ is the covariance between $Y_i(1)$ and $Y_i(0)$ -- **unidentifiable** because you never see both for the same person
 
 **95% Confidence interval (Neyman):**
 $$\hat{\tau} \pm 1.96\sqrt{\widehat{\text{Var}}(\hat{\tau})}$$
@@ -1340,3 +1524,107 @@ This separation mirrors randomized experiments (where the design is locked in be
 | **AIPW** | Combines outcome regression with IPW correction | Doubly robust; most efficient when both models correct | More complex; still fails if both models wrong |
 
 All four methods require the same fundamental assumptions: SUTVA, ignorability, and overlap. They differ in how they use those assumptions, not in whether they need them.
+
+---
+
+## Q19: Why is $S_{10}$ (the covariance between potential outcomes) unidentifiable? What does this imply?
+
+**Answer:** $S_{10} = \frac{1}{N-1}\sum_{i=1}^{N}(Y_i(1) - \bar{Y}(1))(Y_i(0) - \bar{Y}(0))$ requires knowing both $Y_i(1)$ and $Y_i(0)$ for the same person. But the fundamental problem of causal inference means we only ever see one. Among treated people we observe $Y_i(1)$ but not $Y_i(0)$; among control people we observe $Y_i(0)$ but not $Y_i(1)$. So we can never pair up both outcomes for the same person.
+
+**Implication:** Since $S_\tau^2 = S_1^2 + S_0^2 - 2S_{10}$, and $S_{10}$ is unidentifiable, $S_\tau^2$ is also unidentifiable. This is why Neyman's exact variance $\text{Var}(\hat{\tau}) = S_1^2/n_1 + S_0^2/n_0 - S_\tau^2/N$ cannot be computed. We must use the conservative estimator that drops $S_\tau^2/N$.
+
+**Special case:** Under constant treatment effects ($\tau_i = \tau$ for all $i$), we have $S_\tau^2 = 0$, which means $S_{10} = (S_1^2 + S_0^2)/2$. In this case (and only this case), the conservative estimator is exact.
+
+---
+
+## Q20: FWL and extrapolation -- when and why regression breaks down in observational studies
+
+**Answer:** The FWL theorem shows that the regression estimate $\hat{\tau}$ uses weights $w_i = \tilde{Z}_i / \sum \tilde{Z}_j^2$ where $\tilde{Z}_i$ is the residual from regressing $Z$ on $X$.
+
+**Extrapolation problem:** If treated and control groups occupy different regions of covariate space (e.g., all treated people are high-income, all control are low-income), the residuals $\tilde{Z}_i$ tend to be large and the regression is implicitly extrapolating the linear fit into regions with no data. Even if the model perfectly balances $X$, it does not balance $g(X)$ for nonlinear $g$, and with poor overlap the residual imbalance in $g(X)$ gets amplified.
+
+**Key insight from the practice problems:** When you run a regression, always check whether the covariate distributions overlap. If they don't, your regression coefficient is unreliable regardless of its p-value or standard error. The number comes from extrapolation, not from comparing similar people.
+
+---
+
+## Q21: Compare the Wilcoxon rank sum test to the difference-in-means test in a randomization framework
+
+**Answer:** Both can be used as test statistics in Fisher's randomization test. The procedure is the same (enumerate all randomizations, compute the statistic, find the p-value). They differ in what kind of departures from $H_0$ they are best at detecting:
+
+- **Difference in means:** Powerful against constant additive effects (the treatment shifts everyone's outcome by the same amount). Sensitive to outliers because it uses the raw outcome values.
+- **Wilcoxon rank sum:** Uses ranks instead of raw values. More robust to outliers and skewed data. Better at detecting effects when the treatment affects the middle of the distribution more than the tails (or vice versa).
+
+**When to use which:** If outcomes are well-behaved (roughly symmetric, no crazy outliers), difference-in-means is fine. If outcomes are skewed (e.g., income data with a few billionaires), Wilcoxon is safer because one extreme value can't dominate the test statistic.
+
+Both tests have exact p-values from the randomization distribution -- no normal approximation needed.
+
+---
+
+## Q22: What does "design without outcomes" mean in practice?
+
+**Answer:** In an observational study, the design phase constructs comparable groups using only covariates $X$ and treatment $Z$ -- the outcome $Y$ is not used at all. This means:
+
+1. Estimate propensity scores using $X$ and $Z$ only
+2. Match or weight using propensity scores
+3. Check covariate balance (SMDs, Love plots, overlap) using $X$ only
+4. If balance is bad, revise the propensity model and repeat steps 1-3
+5. ONLY after achieving good balance, unblind the outcomes and estimate $\hat{\tau}$
+
+**Why this matters:** It prevents "fishing" -- the temptation to try many different propensity score specifications and pick the one that gives the treatment effect you want. By committing to the design before seeing outcomes, the analysis is more credible. This is the observational study analog of pre-registering a clinical trial.
+
+**What you CAN'T do in the design phase:** Look at $Y$, compute $\hat{\tau}$, or check whether the treatment effect is "significant."
+
+**What you CAN do in the design phase:** Everything involving $X$ and $Z$ -- compute propensity scores, match, check SMDs, make Love plots, check overlap, trim the sample.
+
+---
+
+## Q23: IPW achieves covariate balance -- explain the proof and what it means
+
+**Answer:** The IPW weighted mean of any covariate $X$ in the treated group is:
+
+$$\frac{\sum_{i=1}^{N} \frac{Z_i X_i}{\hat{e}(X_i)}}{\sum_{i=1}^{N} \frac{Z_i}{\hat{e}(X_i)}}$$
+
+Under correct propensity score specification, this converges to $\mathbb{E}[X]$ (the population mean). The same holds for the control group. So the weighted covariate means are equal.
+
+**Proof intuition:** Take any subgroup defined by $X = x$. Among people with covariates $x$, a fraction $e(x)$ are treated. Each treated person gets weight $1/e(x)$. So the total weight of treated people with covariates $x$ is $n_x \cdot e(x) \cdot (1/e(x)) = n_x$ -- the full count of people with those covariates. The weighting "undoes" the selection, making the weighted treated group look like the whole population.
+
+**This is a theorem, not a hope.** If the propensity score model is correct, IPW MUST balance all covariates (and all functions of covariates). This is why checking balance after IPW is both a diagnostic and a test of the propensity score model. If balance is bad, the propensity model is wrong.
+
+---
+
+## Q24: When does IPW become unstable, and what are the practical fixes?
+
+**Answer:** IPW becomes unstable when propensity scores are close to 0 or 1:
+
+**Numerical example:** Suppose $\hat{e}(X_i) = 0.01$ for one treated person. Their weight is $1/0.01 = 100$. If there are 200 treated people total with average weight around 2, this one person has a weight 50 times larger than average. Their single outcome dominates the entire weighted mean. If their outcome happens to be unusual, the entire ATE estimate is dragged by this one person.
+
+**Practical fixes:**
+1. **Trimming:** Drop units with $\hat{e}(X) < c$ or $\hat{e}(X) > 1-c$ (e.g., $c = 0.1$). Changes the estimand to the treatment effect on the overlap subpopulation.
+2. **Hajek/stabilized weights:** Normalize weights to sum to 1. The Hajek estimator $\hat{\tau}_{\text{Hajek}}$ is a ratio estimator -- slightly biased but MUCH lower variance.
+3. **AIPW:** The outcome model "fills in" for extreme-weight regions, reducing dependence on those weights.
+
+**Connection to overlap assumption:** Extreme propensity scores are a symptom of overlap violation. If $e(X) \approx 0$ for some covariate pattern, it means almost nobody with those covariates gets treated. There are essentially no good comparisons to make, and any method (not just IPW) will struggle.
+
+---
+
+## Q25: Work through a complete observational study analysis pipeline
+
+**Answer:** Here is the full sequence, with what you do at each step:
+
+**Step 1 -- Define the question:** What is the treatment? What is the outcome? What is the target population? (E.g., treatment = job training program, outcome = earnings 2 years later, population = unemployed workers in Wisconsin.)
+
+**Step 2 -- List confounders:** Using subject-matter knowledge, list everything that could affect BOTH whether someone gets treated AND their outcome. (Age, education, prior earnings, industry, motivation.) These go into $X$.
+
+**Step 3 -- Estimate propensity scores:** Fit logistic regression $\text{logit}(\hat{e}(X)) = \alpha + \beta^\top X$. Maybe include interactions and nonlinear terms.
+
+**Step 4 -- Check overlap:** Plot histograms of $\hat{e}(X)$ for treated vs. control. If they don't overlap, trim the non-overlapping regions.
+
+**Step 5 -- Match or weight:** Choose your method (matching, IPW, subclassification).
+
+**Step 6 -- Check balance:** Compute SMDs for all covariates. Make a Love plot. All SMDs should be < 0.1. If not, go back to Step 3 and revise the propensity model.
+
+**Step 7 -- (Now look at outcomes):** Estimate $\hat{\tau}$ using your chosen estimator. Build a 95% CI.
+
+**Step 8 -- Sensitivity analysis:** How robust is the result to an unmeasured confounder?
+
+**Key principle:** Steps 3-6 happen WITHOUT ever looking at $Y$. This is the design phase. Step 7 is the analysis phase. The boundary between steps 6 and 7 is sacred.
