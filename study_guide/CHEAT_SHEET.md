@@ -22,6 +22,10 @@
 - **Exact when:** $\tau_i = \tau$ for all $i$ (constant effect). Then $S_\tau^2 = 0$.
   - Under constant effects: $S_1^2 = S_0^2$ and $S_{10} = S_1^2$, so $S_\tau^2 = S_1^2 + S_1^2 - 2S_1^2 = 0$
 
+### ALTERNATE VARIANCE FORM
+$$\text{Var}(\hat{\tau}) = \frac{n_0}{n_1 N}S_1^2 + \frac{n_1}{n_0 N}S_0^2 + \frac{2}{N}S_{10}$$
+Same formula, rearranged. Shows $S_{10}$ directly. Both forms equivalent via algebra.
+
 ### 95% CI (WHY IT WORKS)
 $$\hat{\tau} \pm 1.96\sqrt{s_1^2/n_1 + s_0^2/n_0}$$
 1. Unbiasedness centers $\hat{\tau}$ around $\tau$
@@ -56,6 +60,7 @@ $$\hat{\tau} \pm 1.96\sqrt{s_1^2/n_1 + s_0^2/n_0}$$
 
 ### REGRESSION INSIDE EXPERIMENTS
 - Still unbiased even if model is wrong (because randomization)
+- **Why:** $Z$ is mean-independent of $X$ under randomization, so $\tilde{Z}_i \perp g(X_i)$ --> bias $= \sum w_i g(X_i) = 0$ even if $g$ is wrong
 - Reduces variance (noise-canceling) -- does NOT change estimand
 - Refines a good design, doesn't rescue a bad one
 
@@ -97,7 +102,7 @@ $< 0.1$ = good | $\approx 0.2$ = marginal | $> 0.25$ = bad. Use SMD not t-tests 
   - Breaks in high dimensions (curse of dimensionality) --> add PS caliper
 - **Exact matching** on categorical var can worsen balance on others (forces within-category matches when categories are sparse). **Near-fine balance** relaxes this: enforces marginal distribution balance while allowing cross-category matches.
 - **Distance weights** c(w1,w2): higher w2 on PS = closer PS matches but maybe worse raw covariate matches. Trade-off.
-- **1:1 vs 1:2**: 1:2 uses more controls per treated --> lower variance, but matches may be worse
+- **1:1 vs 1:k**: 1:k uses $k$ controls per treated --> lower variance (more data), but match quality degrades (further matches). `design = c(1,k)` in R.
 
 ### SUBCLASSIFICATION (STRATIFICATION)
 $$\hat{\tau}_{strat} = \sum_{k=1}^{K} \frac{N_k}{N}(\bar{Y}_{T,k} - \bar{Y}_{C,k})$$
@@ -110,8 +115,8 @@ $$\hat{\tau}_{IPW} = \frac{1}{N}\sum\left[\frac{Z_i Y_i}{\hat{e}(X_i)} - \frac{(
 - **Balancing property (PROOF):** $\mathbb{E}\left[\frac{Z}{e(X)}g(X)\right] = \mathbb{E}\left[\frac{E[Z|X]}{e(X)}g(X)\right] = \mathbb{E}[g(X)]$
   - IPW MUST balance all $g(X)$ if PS correct. If balance is bad --> PS model is wrong.
 - **Extreme weights problem:** $e(X) \approx 0$ or $1$ --> weights blow up --> one person dominates --> high variance, instability. This = overlap violation.
-- **Hajek (stabilized):** $\hat{\tau}_{Hajek} = \frac{\sum Z_i Y_i/\hat{e}}{\sum Z_i/\hat{e}} - \frac{\sum(1-Z_i)Y_i/(1-\hat{e})}{\sum(1-Z_i)/(1-\hat{e})}$
-  - Normalizes weights to sum to 1. Slightly biased but much lower variance.
+- **Stabilized weights:** $w_i^{stab} = Z_i \cdot \hat{p}/\hat{e}(X_i) + (1-Z_i)(1-\hat{p})/(1-\hat{e}(X_i))$ where $\hat{p} = n_1/N$. Multiplies by marginal prob of actual treatment received.
+- **Hajek estimator:** Uses stabilized weights in a ratio form: $\frac{\sum w_i^T Y_i}{\sum w_i^T} - \frac{\sum w_i^C Y_i}{\sum w_i^C}$. Slightly biased but much lower variance.
 - Matching stable when PS near 0.5 for most; IPW unstable when any PS extreme.
 
 ### AIPW (DOUBLY ROBUST)
@@ -133,6 +138,13 @@ $$\hat{\tau}_{AIPW} = \frac{1}{N}\sum\left[\hat{\mu}_1(X_i) - \hat{\mu}_0(X_i) +
 - If PS near 0 or 1 somewhere: no good comparisons there. ALL methods fail (not just IPW).
 - **Trim** to e.g. $[0.1, 0.9]$ -- changes estimand to overlap subpopulation ATE.
 - Check with PS histograms for treated vs control.
+
+### R CODE PATTERNS (EXAM)
+- `glm(Z ~ age + edu, family=binomial)` = logistic regression for PS. Coefficients = what predicts SELECTION into treatment (not causal)
+- `multigrp_dist_struc(df,"Z",list(mahal=c("age"),ps="ps"),c(1,2))` = distance combining Mahalanobis (wt 1) + PS (wt 2)
+- `kwaymatching(dist,"Z",indexgroup="treated",design=c(1,2))` = 1:2 matching (each treated gets 2 controls)
+- `tau_ipw = mean(Z*Y/ps - (1-Z)*Y/(1-ps))` = Horvitz-Thompson IPW
+- `tau_aipw = mean(mu1-mu0 + Z*(Y-mu1)/ps - (1-Z)*(Y-mu0)/(1-ps))` = AIPW
 
 ### WHEN ALL METHODS FAIL
 Regression, matching, stratification, IPW, AIPW ALL require assumptions (mainly ignorability). If there is strong **unobserved confounding** (something affects both $Z$ and $Y$ that you didn't measure), all methods give wrong answers. Example: unmeasured disease severity drives both treatment choice and outcome.

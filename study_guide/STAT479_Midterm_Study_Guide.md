@@ -226,7 +226,19 @@ This is a separate failure mode that the practice problems emphasize.
 
 **How to detect it:** Look at the distributions of covariates in the treated and control groups. If they barely overlap, regression is extrapolating. Love plots and histograms help.
 
-## 3.7 Key Limitations Summary
+## 3.7 When Regression IS Unbiased Despite Misspecification
+
+There is one important special case where regression works even if the model is wrong.
+
+**If treatment is mean-independent of covariates** -- meaning $\mathbb{E}[Z \mid X] = \mathbb{E}[Z]$ (treatment assignment doesn't depend on $X$) -- then the regression coefficient $\hat{\tau}$ is unbiased for $\tau$ even if the true outcome model is nonlinear.
+
+**Why?** By FWL, the residual $\tilde{Z}_i = Z_i - \hat{\mathbb{E}}[Z \mid X_i]$. If $Z$ is independent of $X$, then $\hat{\mathbb{E}}[Z \mid X_i]$ is roughly constant, so $\tilde{Z}_i \approx Z_i - \bar{Z}$. This means $\tilde{Z}_i$ is uncorrelated with any function of $X$, including the omitted nonlinear part $g(X)$. So the bias term $\sum w_i g(X_i) \approx 0$.
+
+**When does this hold?** In a **randomized experiment**. Randomization makes $Z$ independent of $X$, which implies mean-independence. This is exactly why regression adjustment inside an experiment (Section 6) is unbiased even if the linear model is wrong -- the randomization guarantees that $\tilde{Z}$ is orthogonal to everything, including omitted nonlinearities.
+
+**When does it fail?** In an **observational study** where treatment depends on covariates. Then $\tilde{Z}_i$ is correlated with $X$, and any omitted nonlinearity in $g(X)$ creates bias.
+
+## 3.8 Key Limitations Summary
 
 Regression assumes:
 - **Linearity:** the relationship between background and outcome is a straight line
@@ -468,6 +480,12 @@ where $S_{10} = \frac{1}{N-1}\sum_{i=1}^{N}\big(Y_i(1) - \bar{Y}(1)\big)\big(Y_i
 
 Since $S_{10}$ is unidentifiable, and $S_\tau^2 = S_1^2 + S_0^2 - 2S_{10}$ contains $S_{10}$, we cannot compute $S_\tau^2$ either.
 
+**Alternate form of Neyman's variance (using $S_{10}$):** If you substitute $S_\tau^2 = S_1^2 + S_0^2 - 2S_{10}$ into the exact variance formula and simplify, you get:
+
+$$\text{Var}(\hat{\tau}) = \frac{n_0}{n_1 N}S_1^2 + \frac{n_1}{n_0 N}S_0^2 + \frac{2}{N}S_{10}$$
+
+This is the same variance written differently. It makes the role of $S_{10}$ explicit: a large positive covariance between potential outcomes ($S_{10} > 0$) increases the variance, while a negative one decreases it. But since $S_{10}$ is unidentifiable, we can't use this form either -- it just helps understand the structure.
+
 ### The conservative workaround -- and WHY it is ALWAYS valid
 
 Here is the chain of logic. Follow each step carefully:
@@ -687,7 +705,7 @@ Regression strips out the part of the outcome that is predictable from covariate
 
 ## 6.3 Key Facts
 
-1. **Still unbiased**, even if the regression model is wrong. In a randomized experiment, $\hat{\tau}_{\text{reg}}$ is unbiased for $\tau$ regardless of whether the linear model is correctly specified. (This is because the randomization makes $\tilde{Z}$ independent of potential outcomes.)
+1. **Still unbiased**, even if the regression model is wrong. In a randomized experiment, $\hat{\tau}_{\text{reg}}$ is unbiased for $\tau$ regardless of whether the linear model is correctly specified. This is because randomization makes $Z$ mean-independent of $X$ (see Section 3.7), so the FWL residual $\tilde{Z}$ is uncorrelated with any function of $X$, including omitted nonlinearities. The bias term $\sum w_i g(X_i) \approx 0$ by the randomization.
 
 2. **Variance is smaller** (or at worst, the same) compared to the simple difference in means. The better covariates predict the outcome, the bigger the improvement.
 
@@ -821,6 +839,18 @@ where $\hat{\Sigma}$ is the sample covariance matrix of the covariates.
 **The curse of dimensionality:** As the number of covariates grows, Mahalanobis distance matching gets worse. In high dimensions, all points are roughly equally far apart, so "nearest neighbor" matches are not actually close. This is why the propensity score (which collapses everything to one dimension) becomes essential in high-dimensional settings.
 
 **A common hybrid approach:** Use Mahalanobis distance matching on a few key covariates, with a **propensity score caliper** -- only allow matches where the propensity scores are within some threshold (e.g., 0.2 standard deviations). This combines the strengths of both approaches.
+
+## 7.8 1:1 vs. 1:k Matching: The Bias-Variance Trade-off
+
+**1:1 matching:** Each treated unit is paired with one control. Fewer data points used but matches tend to be closer (less bias).
+
+**1:k matching (e.g., 1:2):** Each treated unit is matched to $k$ controls. Uses more of the available control data, which **reduces variance** (more information per treated unit). But the 2nd-best match is worse than the 1st-best, so matches are less close on average, which can **increase bias** slightly.
+
+**When to use 1:k:** When you have many more controls than treated units and you want more precision. The extra controls give you a better estimate of each treated unit's counterfactual.
+
+**When to stick with 1:1:** When the control pool is small relative to treated, or when you need the closest possible matches to minimize bias.
+
+**Key exam insight (from practice problem 9):** 1:2 Mahalanobis matching typically has **lower variance** than 1:1 Mahalanobis, while 1:1 Mahalanobis with near-fine balance on a key covariate (like race) typically achieves the **best overall covariate balance**.
 
 ---
 
@@ -1122,6 +1152,12 @@ The difference from plain IPW: the denominators normalize the weights. This is a
 
 **Why "stabilized"?** The weights $Z_i/\hat{e}(X_i)$ can be huge and don't sum to anything nice. But the Hajek weights $\frac{Z_i/\hat{e}(X_i)}{\sum Z_j/\hat{e}(X_j)}$ sum to 1 within the treated group, giving more stable estimates.
 
+**Note on terminology:** The lectures define "stabilized weights" slightly differently from the Hajek estimator. True stabilized weights multiply by the marginal treatment probability:
+
+$$\tilde{w}_i^{(1)} = \frac{Z_i \cdot \Pr(Z=1)}{\hat{e}(X_i)}, \quad \tilde{w}_i^{(0)} = \frac{(1-Z_i) \cdot \Pr(Z=0)}{1-\hat{e}(X_i)}$$
+
+This shrinks extreme weights while preserving the balancing property. The Hajek estimator achieves a similar effect by normalizing by the sum of weights. In practice, both approaches reduce variance compared to raw IPW. For the exam, the key point is the same: raw IPW weights can be huge; stabilization/normalization shrinks them to get more stable estimates at the cost of a small bias.
+
 ## 9.5 Augmented Inverse Probability Weighting (AIPW) -- The "Best of Both Worlds"
 
 AIPW (also called the **doubly robust** estimator) combines IPW with outcome modeling. It tries to fix the main weaknesses of each approach by using both.
@@ -1176,7 +1212,49 @@ You only need **one** of the two models to be right, not both. This is why it is
 2. **Efficiency:** When both models are correct, AIPW achieves the lowest possible variance (the "semiparametric efficiency bound")
 3. **Less sensitive to extreme weights:** The outcome model "fills in" where IPW weights would be extreme
 
-## 9.6 Diagnostics: How Do You Know It's Working?
+## 9.6 Reading R Code on the Exam
+
+Practice problems Q26-Q30 ask you to interpret R code. Here is what each common piece does:
+
+**Propensity score model:**
+```r
+glm(formula = Z ~ age + education + married, family = binomial, data = df)
+```
+This fits a logistic regression predicting treatment ($Z$) from covariates. The fitted values `predict(model, type="response")` are the estimated propensity scores $\hat{e}(X_i)$.
+- Coefficients describe what predicts SELECTION (who gets treated), NOT causal effects
+- Positive coefficient on `married` = married people more likely to be treated
+
+**Distance structure for matching (approxmatch):**
+```r
+components <- list(mahal = c("age","education"), ps = "ps_logit")
+wgts <- c(1, 2)
+dist_str <- multigrp_dist_struc(df, "Z", components, wgts)
+```
+- `components` specifies what goes into the distance: Mahalanobis on listed covariates + propensity score
+- `wgts <- c(1, 2)` means the PS component gets **twice** the weight of Mahalanobis. Higher PS weight = matches closer in PS but possibly worse on individual covariates. Higher Mahalanobis weight = closer on raw covariates but possibly worse PS match.
+
+**Matching:**
+```r
+res <- kwaymatching(dist_str, "Z", indexgroup = "treated", design = c(1,1), .data = df)
+```
+- `design = c(1,1)` = 1:1 matching (one treated, one control per pair)
+- `design = c(1,2)` = 1:2 matching (one treated, two controls)
+- `exactmatchon = "race"` forces exact matching on that variable
+- `finebalanceVars = "race"` enforces marginal distribution balance (near-fine balance)
+
+**IPW in R:**
+```r
+tau_ipw <- mean(Z*Y/ps - (1-Z)*Y/(1-ps))
+```
+This is the raw IPW estimator: $\hat{\tau}_{IPW} = \frac{1}{N}\sum\left[\frac{Z_i Y_i}{\hat{e}} - \frac{(1-Z_i)Y_i}{1-\hat{e}}\right]$
+
+**AIPW in R:**
+```r
+tau_aipw <- mean(mu1 - mu0 + Z*(Y-mu1)/ps - (1-Z)*(Y-mu0)/(1-ps))
+```
+Four terms: (1) `mu1` = predicted outcome under treatment, (2) `mu0` = predicted under control, (3) `Z*(Y-mu1)/ps` = IPW correction for treated residuals, (4) `(1-Z)*(Y-mu0)/(1-ps)` = IPW correction for control residuals.
+
+## 9.7 Diagnostics: How Do You Know It's Working?
 
 After applying any of these methods, you need to check whether the result is trustworthy.
 
