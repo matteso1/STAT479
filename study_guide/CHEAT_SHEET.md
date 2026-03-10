@@ -9,6 +9,7 @@
 - $\tau = \frac{1}{N}\sum[Y_i(1) - Y_i(0)]$ (ATE -- finite population, fixed number)
 - $\hat{\tau} = \bar{Y}_T - \bar{Y}_C$ (difference in means estimator)
 - Under CRD: $\mathbb{E}[\hat{\tau}] = \tau$ (unbiased, from randomization alone)
+- **ATT** $= \mathbb{E}[Y(1)-Y(0)|Z\!=\!1]$ | **ATC** $= \mathbb{E}[Y(1)-Y(0)|Z\!=\!0]$ | In RCT: ATE=ATT=ATC
 
 ### NEYMAN VARIANCE (CRITICAL)
 - $S_z^2 = \frac{1}{N-1}\sum(Y_i(z) - \bar{Y}(z))^2$ for $z=0,1$ (spread of potential outcomes over ALL N people)
@@ -43,7 +44,8 @@ $$\hat{\tau} \pm 1.96\sqrt{s_1^2/n_1 + s_0^2/n_0}$$
 - **Extrapolation:** If treated/control occupy different $X$ regions, $\tilde{Z}_i$ is large at extremes --> extreme weights --> extrapolation into no-data regions
 
 ### FISHER'S FRAMEWORK
-- Sharp null: $H_0: Y_i(1) = Y_i(0)$ for ALL $i$ (zero effect on everyone)
+- **Sharp null:** $H_0: Y_i(1) = Y_i(0)$ for ALL $i$ -- specifies every missing outcome. Required for Fisher's test.
+- **Weak null:** $H_0: \tau = 0$ -- average is zero but individuals may differ. Cannot use randomization test.
 - Under $H_0$: all potential outcomes known ($= Y_i^{obs}$)
 - p-value = fraction of $\binom{N}{n_1}$ randomizations with $|T| \ge |T_{obs}|$
 - **Exact** (no asymptotics), valid from randomization alone
@@ -81,11 +83,11 @@ Same for $Y(0)$. Subtract: $\tau = \mathbb{E}[\mathbb{E}[Y|Z\!=\!1,X] - \mathbb{
 
 ### SELECTION BIAS DECOMPOSITION
 $$\mathbb{E}[Y|Z\!=\!1] - \mathbb{E}[Y|Z\!=\!0] = \underbrace{ATT}_{\text{causal}} + \underbrace{\mathbb{E}[Y(0)|Z\!=\!1] - \mathbb{E}[Y(0)|Z\!=\!0]}_{\text{selection bias}}$$
-Vanishes under randomization or conditional ignorability.
+Derivation: SUTVA converts $Y$ to $Y(Z)$. Add/subtract $\mathbb{E}[Y(0)|Z\!=\!1]$. Vanishes under randomization or ignorability.
 
 ### PROPENSITY SCORE $e(X) = Pr(Z=1|X)$
 - **Balancing property:** $(Y(1),Y(0)) \perp\!\!\!\perp Z \mid e(X)$ -- match on 1 number instead of all $X$
-- Coarsest balancing score (simplest sufficient summary)
+- Coarsest balancing score. **Proof:** $\Pr(X=x|Z\!=\!1,e(X)\!=\!p) = \frac{p \cdot \Pr(X=x)}{p} = \Pr(X=x|e(X)\!=\!p)$
 - Estimated via logistic regression; coefficients describe SELECTION, not causal effects
 - Goal = balance, NOT prediction accuracy
 - Don't include instruments (affect $Z$ but not $Y$) -- increases variance without reducing bias
@@ -93,6 +95,10 @@ Vanishes under randomization or conditional ignorability.
 ### SMD (STANDARDIZED MEAN DIFFERENCE)
 $$SMD = \frac{\bar{X}_T - \bar{X}_C}{\sqrt{(s_T^2 + s_C^2)/2}}$$
 $< 0.1$ = good | $\approx 0.2$ = marginal | $> 0.25$ = bad. Use SMD not t-tests (t-test is sample-size dependent).
+
+### BLOCKED DESIGN
+- Blocked estimator: $\hat{\tau}_{BL} = \sum_k (n_k/N)(\bar{Y}_{T,k} - \bar{Y}_{C,k})$. Reduces variance by removing between-block variation.
+- Matched-pair estimator: $\hat{\tau}_{match} = \frac{1}{n_M}\sum_{i:Z_i=1}[Y_i - Y_{j(i)}]$
 
 ### MATCHING
 - **Design tool** (no outcomes!) -- creates balanced dataset, then simple analysis

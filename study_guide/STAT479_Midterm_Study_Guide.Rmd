@@ -89,11 +89,23 @@ How much the treatment changes the outcome. If taking a drug lowers your blood p
 
 ### Average Treatment Effect (ATE)
 
-The average treatment effect across a whole group of people. Some people might benefit a lot, some a little, some not at all -- the ATE is the average across everyone.
+The average treatment effect across a whole group of people. Some people might benefit a lot, some a little, some not at all -- the ATE is the average across everyone: $\tau = \frac{1}{N}\sum[Y_i(1) - Y_i(0)]$.
+
+### ATT (Average Treatment Effect on the Treated)
+
+The average effect among people who actually received treatment: $\text{ATT} = \mathbb{E}[Y_i(1) - Y_i(0) \mid Z_i = 1]$. This answers: "did the treatment help the people who got it?"
+
+### ATC (Average Treatment Effect on the Control)
+
+The average effect among people who did NOT receive treatment: $\text{ATC} = \mathbb{E}[Y_i(1) - Y_i(0) \mid Z_i = 0]$. This answers: "would the untreated have benefited if they had been treated?"
+
+In a randomized experiment, ATE = ATT = ATC (because treated and control groups are representative of the whole population). In observational studies, they can differ.
 
 ### Selection Bias
 
-The problem that arises when the people who get treated are **systematically different** from the people who don't, even before treatment. If healthier people are more likely to exercise, then comparing exercisers to non-exercisers overestimates the effect of exercise (because exercisers were healthier to begin with).
+The problem that arises when the people who get treated are **systematically difGenuinely the best professor I’ve had at Madison. You really understand how to teach, and the structure of this class was perfect. I also want to say how impressed I am with how thoughtfully you integrated AI into the course. In so many other classes, it feels like instructors just ignore the fact that AI can complete a lot of assignments. I’m not saying that’s necessarily good, but I think educators need to start re-evaluating AI’s role in learning—it can be an incredible tool when it’s used to enhance understanding rather than replace thinking. The way you approached it, with the exam format, AI-supported assignments, and handwritten worksheets, struck exactly the right balance.
+
+ferent** from the people who don't, even before treatment. If healthier people are more likely to exercise, then comparing exercisers to non-exercisers overestimates the effect of exercise (because exercisers were healthier to begin with).
 
 ### Potential Outcomes
 
@@ -258,6 +270,8 @@ $$\hat{\tau} = \sum_{i: Z_i=1} w_i Y_i - \sum_{i: Z_i=0} (-w_i) Y_i$$
 
 This is just a weighted comparison of outcomes between the two groups, where the weights force the groups to look the same on $X$.
 
+**Additional property:** The weights sum to 1 within each group. That is, $\sum_{i: Z_i=1} w_i = 1$ and $\sum_{i: Z_i=0} (-w_i) = 1$. Quick proof: set $Y_i = Z_i$ in the regression. Then $\hat{\tau}$ must equal 1 (since the regression coefficient on $Z$ when $Y = Z$ is trivially 1). But $\hat{\tau} = \sum w_i Y_i = \sum_{i: Z_i=1} w_i \cdot 1 + \sum_{i: Z_i=0} w_i \cdot 0 = \sum_{i: Z_i=1} w_i = 1$.
+
 ## 3.5 When Regression Fails
 
 Here is the critical limitation.
@@ -314,7 +328,9 @@ abline(h = 3, lty = 2, col = "seagreen")
 
 **What you see:** The coral bar (misspecified model) is biased because regression balanced X but NOT X^2. The blue bar (correct model) nails it. This is exactly the $\text{Bias} = \sum w_i g(X_i)$ formula in action.
 
-**Concrete example of misspecification:** Suppose income ($Y$) depends on education ($X$) in a curvy way: people with very high education earn *much* more (the curve bends upward). You run a linear regression of $Y$ on treatment $Z$ and education $X$. The regression perfectly balances education: the weighted average education is the same in both groups. But it does NOT balance $X^2$ (education squared). If treated people happen to have more extreme education values (some very high, some very low), then $\sum w_i X_i^2 \neq 0$, and the curvy relationship between education and income bleeds into your treatment effect estimate.
+**Concrete numerical example (from practice problems):** Treated: $(X, Y) = (1, 1), (3, 9)$. Control: $(X, Y) = (2, 4), (2, 4)$. The means are $\bar{X}_T = 2 = \bar{X}_C$ -- perfectly balanced! But $\bar{X^2}_T = 5 \neq 4 = \bar{X^2}_C$. The true outcome model is $Y = X^2$, so the treatment effect is zero. Yet linear regression reports a nonzero $\hat{\tau}$ because it balances $X$ but not $X^2$.
+
+**Another example of misspecification:** Suppose income ($Y$) depends on education ($X$) in a curvy way: people with very high education earn *much* more (the curve bends upward). You run a linear regression of $Y$ on treatment $Z$ and education $X$. The regression perfectly balances education: the weighted average education is the same in both groups. But it does NOT balance $X^2$ (education squared). If treated people happen to have more extreme education values (some very high, some very low), then $\sum w_i X_i^2 \neq 0$, and the curvy relationship between education and income bleeds into your treatment effect estimate.
 
 ## 3.6 The Extrapolation Problem
 
@@ -508,6 +524,57 @@ where $(b-a)$ is the range of the covariate and $\epsilon$ is how much imbalance
 | Requires assumptions about the outcome | Yes | **No** |
 
 This is why randomized experiments are called the **gold standard** -- they handle everything regression can't.
+
+## 4.5 Other Randomization Designs
+
+The completely randomized design is the simplest, but there are several variants:
+
+### Blocked (Stratified) Randomization
+
+Divide the $N$ units into $K$ blocks based on covariates (e.g., block 1 = young, block 2 = old), then randomize separately within each block.
+
+$$\Pr(\mathbf{Z} = \mathbf{z}) = \prod_{k=1}^{K} \binom{n_k}{m_k}^{-1}$$
+
+where $n_k$ is the block size and $m_k$ is the number treated in block $k$. When $K = 1$, this reduces to a completely randomized design.
+
+**The blocked estimator:** $\hat{\tau}_{BL} = \sum_{k=1}^{K} \frac{n_k}{N}(\bar{Y}_{T,k} - \bar{Y}_{C,k})$
+
+**Why block?** Blocking removes between-block variation from the estimator. If age strongly predicts the outcome, blocking on age ensures the treated and control groups have identical age distributions -- not just balanced in expectation, but *exactly* balanced. This reduces variance compared to pure randomization.
+
+### Bernoulli Trials
+
+Each unit is assigned to treatment independently with probability $p$: $\Pr(Z_i = 1) = p$, independently across $i$.
+
+**Key difference:** The number of treated units is *random* (Binomial$(N, p)$), not fixed. You could end up with all treated or all control by bad luck.
+
+**Advantage:** Simple, easy to implement sequentially (don't need to know $N$ in advance).
+
+**Disadvantage:** Imbalanced group sizes possible.
+
+### Paired Randomization
+
+The strongest form of blocking. Pair up units (e.g., two similar patients), then randomly assign one to treatment and one to control within each pair.
+
+**Advantage:** Very strong local balance -- each matched pair is identical on observed covariates.
+
+**Disadvantage:** Requires good pairing; analysis must respect the paired structure.
+
+**Test statistic for paired designs:** $T = \sum_{b=1}^{B}(Y_{bT} - Y_{bC})$ -- sum the within-pair differences.
+
+### Cluster Randomization
+
+Entire clusters (e.g., schools, hospitals) are assigned to treatment or control. All individuals within a treated cluster get treatment.
+
+**Key issue:** The effective sample size is the number of *clusters*, not individuals. If you randomize 20 schools with 500 students each, your effective $N$ is closer to 20 than 10,000.
+
+## 4.6 Limitations of Randomized Experiments
+
+Even when you can randomize, experiments have limitations:
+
+- **Noncompliance:** Some treated people don't take the treatment; some controls find a way to get it
+- **Attrition:** People drop out of the study
+- **Interference:** One person's treatment affects another's outcome (violates SUTVA)
+- **Ethical/logistical constraints:** Sometimes randomization is simply not possible
 
 ---
 
@@ -886,6 +953,13 @@ $$H_0: Y_i(1) = Y_i(0) \quad \text{for ALL } i$$
 
 The treatment has **absolutely zero effect on every single person**. Under $H_0$, all potential outcomes are known ($= Y_i^{\text{obs}}$).
 
+**Sharp null vs. weak null (important distinction):**
+
+- **Sharp null:** $H_0: Y_i(1) = Y_i(0)$ for ALL $i$. Fully specifies every missing potential outcome. Fisher's test requires this.
+- **Weak null:** $H_0: \tau = 0$ (the *average* effect is zero). Does NOT tell you individual potential outcomes -- some people might benefit and others be harmed, as long as it averages to zero. You CANNOT run a randomization test with the weak null because you don't know the missing outcomes.
+
+Neyman's framework targets the weak null (estimating/testing $\tau = 0$). Fisher's framework requires the sharp null.
+
 ### The Randomization Test
 
 1. Pick a test statistic $T$ (e.g., difference in means)
@@ -928,6 +1002,12 @@ legend("topright",
 ```
 
 **What you see:** Under the sharp null, we know every possible test statistic value. The red line is what we observed. The p-value is the fraction at or beyond the red lines. No normality assumption needed.
+
+**One-sided vs. two-sided p-values:** For a two-sided test, you compute $p = \Pr(|T| \ge |T_{\text{obs}}|)$. Some textbooks compute a one-sided $p$ and double it, but **doubling is NOT always valid** because the randomization distribution may not be symmetric. Always compute the two-sided p-value directly from the proportion of $|T| \ge |T_{\text{obs}}|$.
+
+**The minimum possible p-value** in a randomization test is $1/\binom{N}{n_1}$. For example, with $N = 6$ and $n_1 = 3$, the smallest possible p-value is $1/20 = 0.05$. You literally cannot get a p-value below this no matter how extreme the result. So with very small samples, some significance levels (like 0.01) are impossible to achieve.
+
+**Type I error, Type II error, Power:** Type I error = rejecting $H_0$ when it is true (probability $\alpha$, the significance level). Type II error = failing to reject when $H_0$ is false. Power = $1 - \text{Type II error rate}$ = probability of correctly detecting a real effect.
 
 **Randomization tests are NOT the same as permutation tests.** They look identical computationally, but the justification is different. A permutation test assumes exchangeability (a distributional assumption). A randomization test relies on the fact that you actually randomized.
 
@@ -1027,6 +1107,14 @@ Since you can't randomize, you try to find treated and control people who **look
 **What it is:** Find pairs (or sets) of people -- one treated, one control -- who have similar background characteristics. Discard everyone who doesn't have a good match. Then compare outcomes within the matched sample.
 
 **It is a design tool, not an analysis tool.** Matching creates a new, better dataset.
+
+### The matched estimator
+
+After matching, the treatment effect estimate is simply the average within-pair difference:
+
+$$\hat{\tau}_{\text{match}} = \frac{1}{n_M} \sum_{i: Z_i=1} [Y_i - Y_{j(i)}]$$
+
+where $j(i)$ is the matched control for treated person $i$, and $n_M$ is the number of matched pairs. Under SUTVA, ignorability, and good covariate balance, this is approximately unbiased for $\tau$.
 
 ### Types of Matching
 
@@ -1260,9 +1348,19 @@ for (i in 1:3) {
 
 In observational data, if you just compare treated and untreated groups:
 
-$$\mathbb{E}[Y \mid Z=1] - \mathbb{E}[Y \mid Z=0] = \underbrace{\mathbb{E}[Y(1) - Y(0) \mid Z=1]}_{\text{causal effect on treated}} + \underbrace{\mathbb{E}[Y(0) \mid Z=1] - \mathbb{E}[Y(0) \mid Z=0]}_{\text{selection bias}}$$
+$$\mathbb{E}[Y \mid Z=1] - \mathbb{E}[Y \mid Z=0] = \underbrace{\mathbb{E}[Y(1) - Y(0) \mid Z=1]}_{\text{ATT}} + \underbrace{\mathbb{E}[Y(0) \mid Z=1] - \mathbb{E}[Y(0) \mid Z=0]}_{\text{selection bias}}$$
 
-The **selection bias** is the difference in baseline outcomes between treated and control groups. It exists because people who choose treatment are different from those who don't, **even before treatment**.
+**How to derive this (exam-ready, add-and-subtract trick):**
+
+Start: $\mathbb{E}[Y \mid Z\!=\!1] - \mathbb{E}[Y \mid Z\!=\!0]$. By SUTVA/consistency, $Y_i = Y_i(Z_i)$, so $\mathbb{E}[Y \mid Z\!=\!1] = \mathbb{E}[Y(1) \mid Z\!=\!1]$ and $\mathbb{E}[Y \mid Z\!=\!0] = \mathbb{E}[Y(0) \mid Z\!=\!0]$.
+
+Now add and subtract $\mathbb{E}[Y(0) \mid Z\!=\!1]$:
+
+$$= \mathbb{E}[Y(1) \mid Z\!=\!1] - \mathbb{E}[Y(0) \mid Z\!=\!1] + \mathbb{E}[Y(0) \mid Z\!=\!1] - \mathbb{E}[Y(0) \mid Z\!=\!0]$$
+
+$$= \text{ATT} + \text{selection bias}$$
+
+The **selection bias** is the difference in baseline (untreated) outcomes between the groups. It exists because people who choose treatment are different from those who don't, **even before treatment**.
 
 ### Visualizing Selection Bias
 
@@ -1333,6 +1431,12 @@ For every type of person, there is a nonzero chance of being in either group. If
 
 No interference, no hidden versions (covered above).
 
+### "Strong Ignorability" = Ignorability + Overlap Together
+
+Some lectures use the term **strong ignorability** to mean assumptions 1 and 2 combined. If someone says "assume strong ignorability," they mean both $(Y(1), Y(0)) \perp\!\!\!\perp Z \mid X$ AND $0 < \Pr(Z\!=\!1 \mid X) < 1$.
+
+**Notation reminder:** $A \perp\!\!\!\perp B \mid C$ means $\Pr(A \mid B, C) = \Pr(A \mid C)$. Conditional on $C$, knowing $B$ gives you no additional information about $A$.
+
 ## 8.4 Identification: How These Assumptions Let You Estimate Causal Effects
 
 Under these three assumptions:
@@ -1365,7 +1469,15 @@ $$(Y(1), Y(0)) \perp\!\!\!\perp Z \mid e(X)$$
 
 You don't need to match on all covariates. Just match on this single number. Within groups of people who have the same propensity score, covariates are balanced.
 
-It is the **coarsest balancing score** -- the simplest possible summary of $X$ that is sufficient for balance.
+It is the **coarsest balancing score** -- the simplest possible summary of $X$ that is sufficient for balance. (A **balancing score** is any function $b(X)$ such that $X \perp\!\!\!\perp Z \mid b(X)$. The full covariate vector $X$ is trivially a balancing score. The propensity score $e(X)$ is the coarsest -- the most compressed one that still works.)
+
+### Proof sketch of the balancing property (exam-ready)
+
+We want to show $X \perp\!\!\!\perp Z \mid e(X)$. Fix a propensity score value $p$. Among all people with $e(X) = p$:
+
+$$\Pr(X = x \mid Z = 1, e(X) = p) = \frac{\Pr(Z=1 \mid X=x) \Pr(X=x)}{\Pr(Z=1 \mid e(X)=p)} = \frac{p \cdot \Pr(X = x)}{p} = \Pr(X = x \mid e(X) = p)$$
+
+The key step: $\Pr(Z=1 \mid X=x) = e(x) = p$ for everyone in this group, so it factors out and cancels. Within any PS stratum, treated people are a random draw from that stratum. So covariates are balanced.
 
 ### Visualizing the Propensity Score
 
@@ -1439,6 +1551,8 @@ $$\Pr(Z = 1 \mid X) = \frac{\exp(\alpha + \beta^\top X)}{1 + \exp(\alpha + \beta
 
 **Why separate?** If you look at outcomes first, you might choose the method that gives the answer you want. This mirrors how clinical trials lock in the analysis plan before unblinding.
 
+**Concrete example of what goes wrong:** Suppose during matching you notice that some treated units have very low outcomes, making them "hard to match." If you drop them (because their outcomes look weird), you bias the estimated effect upward -- you've cherry-picked the treated units with good outcomes. This is exactly the kind of fishing that the design/analysis separation prevents.
+
 ### Visualizing the Pipeline
 
 ```{r design-analysis, fig.height=6}
@@ -1490,7 +1604,11 @@ Divide the sample into strata based on $\hat{e}(X)$:
 
 $$\hat{\tau}_{\text{strat}} = \sum_{k=1}^{K} \frac{N_k}{N} \left(\bar{Y}_{T,k} - \bar{Y}_{C,k}\right)$$
 
-Cochran (1968): 5 subclasses remove ~90% of bias. More strata = less bias but noisier.
+Cochran (1968): 5 subclasses remove ~90% of bias (for normally distributed PS and linear outcomes). More strata = less bias but noisier.
+
+**Practical issue:** If one stratum has very few treated units (e.g., $n_1 = 1, n_0 = 42$), the within-stratum treatment effect is based on a single person -- huge variance. **Fix:** Merge that stratum with its neighbor, or reduce the number of strata.
+
+**If the PS model is wrong:** Stratification on a misspecified PS can actually *worsen* balance compared to stratifying directly on raw covariates. The PS is only as good as the model behind it.
 
 ## 9.3 Inverse Probability Weighting (IPW)
 
@@ -1522,7 +1640,15 @@ The propensity score cancels perfectly.
 
 If the PS is correct, the IPW weighted covariate means converge to the same thing in both groups. **This is not a hope, it is a mathematical consequence.**
 
-**Proof sketch:** $\mathbb{E}\left[\frac{Z}{e(X)}g(X)\right] = \mathbb{E}\left[\frac{E[Z|X]}{e(X)}g(X)\right] = \mathbb{E}[g(X)]$ for any $g$.
+**Full proof (know this for the exam):** For any function $g(X)$:
+
+$$\mathbb{E}\left[\frac{Z \cdot g(X)}{e(X)}\right] = \mathbb{E}\left[\mathbb{E}\left[\frac{Z \cdot g(X)}{e(X)} \,\Big|\, X\right]\right] \quad\text{(tower property)}$$
+
+$$= \mathbb{E}\left[\frac{g(X)}{e(X)} \cdot \mathbb{E}[Z \mid X]\right] \quad\text{(g(X) and e(X) are functions of X, so they come out)}$$
+
+$$= \mathbb{E}\left[\frac{g(X)}{e(X)} \cdot e(X)\right] = \mathbb{E}[g(X)] \quad\text{(e(X) cancels!)}$$
+
+This works for ANY $g$: $g(X) = X$, $g(X) = X^2$, $g(X) = \sin(X)$, anything. So IPW-weighted treated group has the same mean of every function of covariates as the population. If this doesn't hold in your data, your PS model is wrong.
 
 ### Visualizing IPW: How Reweighting Creates Balance
 
@@ -1854,6 +1980,14 @@ $$\hat{\tau}_{\text{AIPW}} = \frac{1}{N}\sum\left[\hat{\mu}_1(X_i) - \hat{\mu}_0
 
 **AIPW doubly robust:** Consistent if $\hat{\mu}_1, \hat{\mu}_0$ correct **OR** $\hat{e}$ correct
 
+**Stabilized weights:** $\tilde{w}_i^{(1)} = \frac{Z_i \cdot \Pr(Z\!=\!1)}{\hat{e}(X_i)}, \quad \tilde{w}_i^{(0)} = \frac{(1-Z_i)\Pr(Z\!=\!0)}{1-\hat{e}(X_i)}$
+
+**ATT:** $\mathbb{E}[Y(1) - Y(0) \mid Z = 1]$ | **ATC:** $\mathbb{E}[Y(1) - Y(0) \mid Z = 0]$
+
+**Matched-pair estimator:** $\hat{\tau}_{\text{match}} = \frac{1}{n_M}\sum_{i:Z_i=1}[Y_i - Y_{j(i)}]$
+
+**Blocked estimator:** $\hat{\tau}_{BL} = \sum_{k=1}^{K}\frac{n_k}{N}(\bar{Y}_{T,k} - \bar{Y}_{C,k})$
+
 **Subclassification:**
 $$\hat{\tau}_{\text{strat}} = \sum_{k=1}^{K}\frac{N_k}{N}\left(\bar{Y}_{T,k} - \bar{Y}_{C,k}\right)$$
 
@@ -1935,7 +2069,9 @@ An A/B test assigns 5 of 10 users to a new interface. Observed sessions:
 
 **(a)** $\hat{\tau} = 7 - 4.4 = 2.6$
 
-**(b)** Under $H_0$, outcomes are fixed. There are $\binom{10}{5} = 252$ splits. p-value = fraction with $|T| \ge 2.6$.
+**(b)** Under $H_0$, outcomes are fixed at {8,6,7,9,5,4,6,5,3,4}. There are $\binom{10}{5} = 252$ splits. For each, compute $T = \bar{Y}_T - \bar{Y}_C$.
+
+**Shortcut:** Note $T(z) = \frac{1}{5}(2S_T(z) - 57)$ where $S_T = \sum_{i:Z_i=1} Y_i$ and 57 is the total. So $|T| \ge 2.6 \iff S_T \ge 35$ or $S_T \le 22$. Count: 1 subset with $S_T = 21$, 4 with $S_T = 22$, 4 with $S_T = 35$, 2 with $S_T = 36$, giving 11/252 = 0.0437. p-value = fraction with $|T| \ge 2.6$.
 
 **(c)** $s_1^2 = 2.5$, $s_0^2 = 1.3$, $\widehat{\text{Var}} = 0.76$, SE $= 0.872$, 95% CI: $[0.89, 4.31]$
 
@@ -2019,6 +2155,68 @@ All require SUTVA + ignorability + overlap.
 8. Sensitivity analysis
 
 Steps 3-6 = design phase (NO outcomes). Step 7 = analysis phase.
+
+---
+
+## Q21: Compute an SMD from raw numbers
+
+$N = 200$, $n_1 = 100$. For covariate age: $\bar{X}_T = 41.2$, $\bar{X}_C = 40.9$, pooled $s_X = 12$.
+
+**Answer:** $\text{SMD} = (41.2 - 40.9) / 12 = 0.025$. This is well below 0.1 -- excellent balance. In a randomized experiment, small SMDs like this are expected and do not indicate confounding.
+
+---
+
+## Q22: Read a balance table and identify problems
+
+After matching, the SMDs are: age (0.05), education (0.08), married (0.12), race_black (0.28).
+
+**Answer:** Age and education are well-balanced (< 0.1). Married is borderline (0.12 > 0.1). Race_black is badly balanced (0.28 >> 0.1). The matching needs improvement -- try adding race to the exact matching variables, or use `finebalanceVars = "race"` to enforce marginal balance on race.
+
+---
+
+## Q23: When does matching outperform IPW?
+
+**Answer:** Matching is stable when most treated and control units have propensity scores near 0.5 -- easy to find close matches. IPW becomes unstable when even a few units have extreme PS (near 0 or 1), because those units get huge weights. If the PS distribution is spread out with tails near 0 and 1, matching will typically give more stable estimates than raw IPW.
+
+---
+
+## Q24: Interpreting R code -- logistic regression coefficients
+
+`glm(Z ~ age + married, family=binomial)` gives coefficient 0.8 on `married`.
+
+**Answer:** This means married people are more likely to be SELECTED into treatment (higher log-odds of treatment). This is NOT a causal effect of marriage on anything. It describes the selection process. We use these fitted values as propensity scores for matching or weighting.
+
+---
+
+## Q25: Interpreting R code -- distance weights in matching
+
+`wgts <- c(1, 2)` with `components = list(mahal = c("age"), ps = "ps_logit")`.
+
+**Answer:** The PS component gets twice the weight of Mahalanobis. Matches will prioritize being close in propensity score over being close in raw age. Higher PS weight = better PS balance but potentially worse individual covariate balance. You can check with SMDs after matching.
+
+---
+
+## Q26: Walk through each term of AIPW in R code
+
+`mean(mu1 - mu0 + Z*(Y-mu1)/ps - (1-Z)*(Y-mu0)/(1-ps))`
+
+**Answer:** Term 1 (`mu1`): predicted outcome under treatment from the outcome model. Term 2 (`mu0`): predicted outcome under control. Their difference = regression estimate of ATE. Term 3 (`Z*(Y-mu1)/ps`): for treated units, this is the regression residual weighted by 1/PS -- corrects the regression if the outcome model is wrong. Term 4 (`(1-Z)*(Y-mu0)/(1-ps)`): same correction for control units. If the outcome model is perfect, residuals are 0 and correction vanishes. If the PS model is perfect, the correction rescues a bad outcome model.
+
+---
+
+## Q27: When all methods fail -- unobserved confounding
+
+Treatment = new surgical technique. Outcome = recovery time. Unobserved confounder = disease severity (sicker patients get the old technique because surgeons play it safe).
+
+**Answer:** All methods (regression, matching, IPW, AIPW) assume ignorability -- that all confounders are measured. If severity is unmeasured, treated patients are systematically less sick than controls. Every method will estimate a treatment effect that is too large, because it is confounded with the selection of healthier patients into the new technique. No amount of modeling fixes an unmeasured confounder.
+
+---
+
+## Q28: What does the overlap assumption buy you? What happens without it?
+
+Treated PS = {0.72, 0.80, 0.85, 0.91}. Control PS = {0.05, 0.10, 0.12, 0.15}.
+
+**Answer:** There is essentially ZERO overlap. Matching: no close matches exist (PS gap is huge). Subclassification: strata contain only treated or only control, not both. IPW: control weights $1/(1-0.05) = 20$, $1/(1-0.10) = 11$ are extreme; treated weights are mild. ALL methods are extrapolating or relying on unstable weights. Solution: trim to the overlap region (but here there IS no overlap region). Honest conclusion: the treatment effect cannot be reliably estimated for this population.
 
 ---
 
