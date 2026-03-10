@@ -1,0 +1,2027 @@
+---
+title: "STAT 479: Causal Inference -- Midterm Study Guide"
+subtitle: "Weeks 1-7 | Exam: March 12, 2026"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    toc_depth: 3
+    theme: flatly
+    code_folding: show
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = TRUE,
+  warning = FALSE,
+  message = FALSE,
+  fig.width = 9,
+  fig.height = 5,
+  comment = "#>"
+)
+set.seed(479)
+```
+
+**Format:** Free response / short answer on blank paper. One sheet (front+back) cheat sheet allowed. Calculator allowed. ~75 minutes, ~10 questions.
+
+---
+
+## How to Use This Guide
+
+Read it start to finish like a story. Every concept is explained in plain English first, then the math version follows. When you see a new term, it will always be defined right there in normal words before any formula appears. The math is there so you can reproduce it on the exam, but the goal is for you to actually **understand** what is going on first.
+
+The R code chunks generate graphs that visualize each concept. Knit with `Ctrl+Shift+K` in RStudio.
+
+---
+
+# 1. The Big Picture
+
+## What is this class actually about?
+
+This class is about one question: **"Did this thing actually cause that outcome, or is it just a coincidence?"**
+
+That sounds simple, but it turns out to be really hard. Here is a classic example:
+
+> People who go to college earn more money than people who don't. Does college **cause** higher earnings? Or is it that the kinds of people who go to college (wealthier families, better schools, more motivated) would have earned more anyway?
+
+That is the core problem this class tries to solve. The naive answer ("just compare the two groups") is almost always wrong because the two groups are different in ways that have nothing to do with the treatment.
+
+## The one sentence summary of the whole course
+
+**To figure out if something causes something else, you need to compare apples to apples -- and this class teaches you all the ways to do that (or at least try to).**
+
+---
+
+# 2. Key Vocabulary
+
+Before we go any further, let me define every important term in plain English. Refer back to this section whenever you see a word you don't recognize.
+
+### Treatment ($Z$)
+
+The thing whose effect you want to measure. It is binary (yes/no, 1/0) in this class.
+
+- Examples: taking a drug vs. placebo, getting a college degree vs. not, seeing an ad vs. not seeing it
+- $Z = 1$ means "treated" (got the thing), $Z = 0$ means "control" (didn't get it)
+
+### Outcome ($Y$)
+
+The result you are measuring. The thing you think might be affected by the treatment.
+
+- Examples: income, test score, whether someone bought a product, health outcome
+
+### Covariates ($X$)
+
+**Background characteristics** of a person/unit that exist **before** the treatment happens. Think of these as "things about a person that might matter."
+
+- Examples: age, gender, family income, education level, prior health conditions, browsing history
+- These are also called "pre-treatment variables" -- they describe who someone is before any treatment is applied
+- A covariate is literally just a variable that could vary together with (co-vary with) the treatment and the outcome
+
+### Confounders
+
+A confounder is a covariate that affects **both** the treatment and the outcome. This is the source of all problems in causal inference.
+
+**Example:** Family wealth is a confounder for the college-earnings question. Wealthy families are more likely to send kids to college (affects treatment), AND kids from wealthy families earn more regardless of college (affects outcome). So if you just compare college grads to non-grads, part of the earnings difference is from college, and part is from family wealth.
+
+### Treatment Effect
+
+How much the treatment changes the outcome. If taking a drug lowers your blood pressure by 10 points, the treatment effect is -10.
+
+### Average Treatment Effect (ATE)
+
+The average treatment effect across a whole group of people. Some people might benefit a lot, some a little, some not at all -- the ATE is the average across everyone.
+
+### Selection Bias
+
+The problem that arises when the people who get treated are **systematically different** from the people who don't, even before treatment. If healthier people are more likely to exercise, then comparing exercisers to non-exercisers overestimates the effect of exercise (because exercisers were healthier to begin with).
+
+### Potential Outcomes
+
+The imaginary "what if" outcomes. For each person, there are two potential outcomes:
+
+- $Y_i(1)$: what **would** happen to person $i$ if they got the treatment
+- $Y_i(0)$: what **would** happen to person $i$ if they did NOT get the treatment
+
+The problem: you only ever see ONE of these. If someone went to college, you see their income with college, but you'll never know what their income would have been without it. The one you don't see is called the **counterfactual**.
+
+### Estimand
+
+The thing you are trying to estimate. Your target. In this class, the main estimand is the average treatment effect.
+
+### Estimator
+
+The formula or method you use to try to estimate the estimand. For example, "take the average outcome of the treated group minus the average outcome of the control group" is an estimator.
+
+### Unbiased
+
+An estimator is unbiased if, on average (across many hypothetical repetitions of the study), it gives you the right answer. It might be a little high or a little low in any one study, but it's not systematically off in one direction.
+
+### Variance (of an estimator)
+
+How much the estimator bounces around from study to study. Low variance = precise, high variance = noisy. Even an unbiased estimator can be useless if the variance is huge.
+
+### Consistency (assumption)
+
+The observed outcome equals the potential outcome corresponding to the treatment actually received. In symbols: if $Z_i = 1$, then $Y_i^{\text{obs}} = Y_i(1)$. If $Z_i = 0$, then $Y_i^{\text{obs}} = Y_i(0)$. This seems obvious but it is doing real work -- it says there are no hidden versions of treatment that would change what $Y_i(1)$ means. (This is closely related to SUTVA.)
+
+### Propensity Score
+
+The probability that a person gets treated, based on their background characteristics. If you are young, healthy, and wealthy, maybe you have a 70% chance of getting the treatment. That 70% is your propensity score. Formally: $e(X) = \Pr(Z = 1 \mid X)$.
+
+### Tower Property (Law of Iterated Expectations)
+
+A math rule that says: you can compute an overall average by first averaging within subgroups, then averaging across subgroups. In symbols: $\mathbb{E}[Y] = \mathbb{E}[\mathbb{E}[Y \mid X]]$. This comes up repeatedly in the identification proofs and in showing IPW is unbiased. Think of it as: "the average of the group averages is the overall average" (when you weight by group size).
+
+---
+
+# 3. Week 1: Regression -- A Flawed But Useful First Tool
+
+## 3.1 The Problem Regression Tries to Solve
+
+You want to know: does treatment $Z$ affect outcome $Y$? But there are confounders $X$ (background characteristics) muddying the waters.
+
+**Example:** Does a college degree ($Z$) increase income ($Y$)? Family background ($X$) is a confounder -- it makes people more likely to go to college AND makes them earn more.
+
+If you just compare average income of college grads vs. non-grads, you get a mix of the college effect and the family background effect. You can't tell them apart.
+
+**Regression tries to "hold constant" the confounders** so you can isolate the treatment effect.
+
+## 3.2 What the Regression Model Says
+
+The model is:
+
+$$Y = \tau Z + \beta^\top X + \varepsilon$$
+
+(The notation $\beta^\top X$ just means "a weighted combination of all your background characteristics." If $X$ has three variables -- age, income, education -- then $\beta^\top X = \beta_1 \cdot \text{age} + \beta_2 \cdot \text{income} + \beta_3 \cdot \text{education}$. The $\beta$'s are the weights that regression figures out.)
+
+In plain English:
+
+> Your outcome ($Y$) equals the treatment effect ($\tau$) times whether you got treated ($Z$), plus the effect of your background ($\beta^\top X$), plus random noise ($\varepsilon$).
+
+The coefficient $\tau$ is the thing you care about. It represents: **if two people had the exact same background ($X$), but one got treated and the other didn't, how much would their outcomes differ?**
+
+**The catch:** This only works if the model is correct. If the real relationship between $X$ and $Y$ is not a straight line (it's curved, or there are interactions, etc.), then $\tau$ can be wrong.
+
+## 3.3 The Frisch-Waugh-Lovell (FWL) Theorem
+
+This theorem explains **what regression is actually doing under the hood**. It is the most important result from Week 1.
+
+### Plain English version
+
+When you run a regression of $Y$ on both $Z$ and $X$, the coefficient on $Z$ is the same thing you'd get if you:
+
+1. First predicted $Z$ from $X$ (how well can you guess treatment status from background?)
+2. Took the **leftover** part of $Z$ that $X$ can't predict (call this $\tilde{Z}$)
+3. Looked at how that leftover relates to $Y$
+
+Think of it like this: regression strips away everything about treatment assignment that can be explained by background characteristics, and then sees if the **unexplained** part of treatment is related to the outcome.
+
+### The math
+
+The residual from regressing $Z$ on $X$ is:
+
+$$\tilde{Z}_i = Z_i - \hat{\mathbb{E}}[Z \mid X_i]$$
+
+This is the "part of treatment that can't be explained by covariates."
+
+The regression coefficient on $Z$ is then:
+
+$$\hat{\tau} = \frac{\sum_{i=1}^{n} \tilde{Z}_i Y_i}{\sum_{i=1}^{n} \tilde{Z}_i^2}$$
+
+### Visualizing FWL: The Residualization
+
+```{r fwl-visualization, fig.height=4}
+# ----- Generate observational data with a confounder -----
+n <- 200
+X <- rnorm(n, 50, 10)                    # covariate (e.g., age)
+Z <- rbinom(n, 1, plogis(-2 + 0.04 * X)) # treatment depends on X
+Y <- 3 * Z + 0.5 * X + rnorm(n, 0, 3)   # outcome depends on both
+
+# ----- FWL step 1: regress Z on X, get residuals -----
+Z_on_X <- lm(Z ~ X)
+Z_tilde <- resid(Z_on_X)  # the part of Z that X can't explain
+
+# ----- FWL step 2: regress Y on Z_tilde -----
+fwl_fit <- lm(Y ~ Z_tilde)
+tau_fwl <- coef(fwl_fit)["Z_tilde"]
+
+# compare to full regression
+full_fit <- lm(Y ~ Z + X)
+tau_full <- coef(full_fit)["Z"]
+
+# ----- Plot -----
+par(mfrow = c(1, 3), mar = c(4, 4, 3, 1))
+
+# Panel 1: Z vs X -- treatment depends on the covariate
+plot(X, Z, pch = 16, col = adjustcolor("gray30", 0.4), cex = 0.8,
+     main = "Step 1: Z depends on X",
+     xlab = "Covariate X (e.g., age)", ylab = "Treatment Z")
+lines(sort(X), fitted(Z_on_X)[order(X)], col = "firebrick", lwd = 2)
+mtext("Red line = E[Z | X]", side = 1, line = 2.8, cex = 0.7, col = "firebrick")
+
+# Panel 2: Z_tilde -- the residual (part X can't explain)
+plot(X, Z_tilde, pch = 16, col = adjustcolor("steelblue", 0.5), cex = 0.8,
+     main = expression("Step 2: Residualize " * tilde(Z) * " = Z - E[Z|X]"),
+     xlab = "Covariate X", ylab = expression(tilde(Z)))
+abline(h = 0, lty = 2, col = "gray50")
+mtext("Residual is uncorrelated with X (balanced!)", side = 1, line = 2.8, cex = 0.7)
+
+# Panel 3: Y vs Z_tilde -- the FWL regression
+plot(Z_tilde, Y, pch = 16, col = adjustcolor("seagreen", 0.5), cex = 0.8,
+     main = expression("Step 3: Regress Y on " * tilde(Z)),
+     xlab = expression(tilde(Z)), ylab = "Outcome Y")
+abline(fwl_fit, col = "firebrick", lwd = 2)
+mtext(paste0("Slope = ", round(tau_fwl, 3), " (same as full regression: ",
+             round(tau_full, 3), ")"),
+      side = 1, line = 2.8, cex = 0.7, col = "firebrick")
+```
+
+**What you see:** Panel 2 is the key -- after residualizing, the "treatment residual" is uncorrelated with X. Regression has stripped out the confounder. The slope in Panel 3 IS the regression coefficient on Z from the full model.
+
+## 3.4 Regression as a Reweighting/Balancing Trick
+
+Here is the deeper insight. Regression is not just fitting a line. It is actually **reweighting** people so that the treated and control groups look the same on their background characteristics.
+
+Define the regression weights:
+
+$$w_i = \frac{\tilde{Z}_i}{\sum_{j=1}^{n} \tilde{Z}_j^2}$$
+
+Then the key result is:
+
+$$\sum_{i=1}^{n} w_i X_i = 0$$
+
+**What this means in plain English:** After reweighting, the weighted average of the background characteristics is exactly the same between the treated and control groups. Regression has "balanced" the groups.
+
+And you can write the estimator as:
+
+$$\hat{\tau} = \sum_{i: Z_i=1} w_i Y_i - \sum_{i: Z_i=0} (-w_i) Y_i$$
+
+This is just a weighted comparison of outcomes between the two groups, where the weights force the groups to look the same on $X$.
+
+## 3.5 When Regression Fails
+
+Here is the critical limitation.
+
+Suppose the **real** relationship between $X$ and $Y$ is nonlinear (say $Y$ depends on $X^2$, or $\log(X)$, or some other curvy function), but you just put $X$ in your regression as a straight line.
+
+Regression balances $X$ perfectly ($\sum w_i X_i = 0$), but it does **not** balance $X^2$ or $\log(X)$ or any other nonlinear function you didn't include.
+
+**The bias from misspecification is:**
+
+$$\text{Bias} = \frac{\sum_{i=1}^{n} \tilde{Z}_i \, g(X_i)}{\sum_{i=1}^{n} \tilde{Z}_i^2}$$
+
+where $g(X)$ is the nonlinear part you left out.
+
+### Visualizing Misspecification Bias
+
+```{r misspecification-bias, fig.height=4.5}
+# ----- Data where the TRUE relationship is quadratic -----
+n <- 300
+X <- runif(n, 0, 10)
+Z <- rbinom(n, 1, plogis(-1 + 0.2 * X))  # treatment depends on X
+# TRUE model: Y depends on X^2 (nonlinear!), but we only put X in the regression
+Y <- 3 * Z + 0.1 * X^2 + rnorm(n, 0, 2)
+
+# --- Correct model (includes X^2) ---
+correct_fit <- lm(Y ~ Z + X + I(X^2))
+tau_correct <- coef(correct_fit)["Z"]
+
+# --- Misspecified model (only includes X, not X^2) ---
+wrong_fit <- lm(Y ~ Z + X)
+tau_wrong <- coef(wrong_fit)["Z"]
+
+# ----- Plot -----
+par(mfrow = c(1, 2), mar = c(4, 4, 3, 1))
+
+# Panel 1: the true relationship is curved
+plot(X, Y - 3 * Z, pch = 16, col = adjustcolor("gray40", 0.4), cex = 0.6,
+     main = "True Relationship: Y vs X is Curved",
+     xlab = "X", ylab = "Y (removing treatment effect)")
+curve(0.1 * x^2, from = 0, to = 10, add = TRUE, col = "seagreen", lwd = 2)
+abline(lm((Y - 3 * Z) ~ X), col = "firebrick", lwd = 2, lty = 2)
+legend("topleft", legend = c("True: 0.1 * X^2", "Linear fit"),
+       col = c("seagreen", "firebrick"), lwd = 2, lty = c(1, 2), bty = "n", cex = 0.8)
+
+# Panel 2: how estimates compare
+ests_compare <- c(3, tau_correct, tau_wrong)
+names(ests_compare) <- c("Truth", "Correct Model\n(includes X^2)", "Misspecified\n(only X)")
+bp <- barplot(ests_compare, col = c("seagreen", "steelblue", "coral"),
+        main = "Treatment Effect Estimates",
+        ylab = expression(hat(tau)), ylim = c(0, max(ests_compare) * 1.3))
+text(bp, ests_compare, labels = round(ests_compare, 2), pos = 3)
+abline(h = 3, lty = 2, col = "seagreen")
+```
+
+**What you see:** The coral bar (misspecified model) is biased because regression balanced X but NOT X^2. The blue bar (correct model) nails it. This is exactly the $\text{Bias} = \sum w_i g(X_i)$ formula in action.
+
+**Concrete example of misspecification:** Suppose income ($Y$) depends on education ($X$) in a curvy way: people with very high education earn *much* more (the curve bends upward). You run a linear regression of $Y$ on treatment $Z$ and education $X$. The regression perfectly balances education: the weighted average education is the same in both groups. But it does NOT balance $X^2$ (education squared). If treated people happen to have more extreme education values (some very high, some very low), then $\sum w_i X_i^2 \neq 0$, and the curvy relationship between education and income bleeds into your treatment effect estimate.
+
+## 3.6 The Extrapolation Problem
+
+This is a separate failure mode that the practice problems emphasize.
+
+**What it is:** If treated and control groups occupy different regions of the covariate space, regression is forced to **extrapolate** -- it uses the fitted line to predict what would happen in a region where you have no data.
+
+```{r extrapolation, fig.height=5}
+# ----- Generate data with poor overlap -----
+n <- 150
+X_t <- rnorm(75, mean = 70, sd = 8)
+X_c <- rnorm(75, mean = 40, sd = 8)
+X <- c(X_t, X_c)
+Z <- c(rep(1, 75), rep(0, 75))
+
+# true outcome: NONLINEAR in X
+Y <- 3 * Z + 0.01 * X^2 + rnorm(n, 0, 3)
+
+# fit linear regression (will extrapolate across the gap)
+fit <- lm(Y ~ Z + X)
+
+# ----- Plot -----
+par(mar = c(4, 4, 3, 1))
+plot(X, Y, pch = 16, col = adjustcolor(ifelse(Z == 1, "firebrick", "steelblue"), 0.5),
+     cex = 0.8, main = "The Extrapolation Problem",
+     xlab = "Covariate X", ylab = "Outcome Y")
+
+# regression lines for each group
+x_seq <- seq(min(X), max(X), length = 200)
+lines(x_seq, predict(fit, newdata = data.frame(Z = 1, X = x_seq)),
+      col = "firebrick", lwd = 2, lty = 2)
+lines(x_seq, predict(fit, newdata = data.frame(Z = 0, X = x_seq)),
+      col = "steelblue", lwd = 2, lty = 2)
+
+# highlight the gap region
+rect(max(X_c) - 5, par("usr")[3], min(X_t) + 5, par("usr")[4],
+     col = adjustcolor("gold", 0.15), border = NA)
+text(55, max(Y) - 3, "EXTRAPOLATION\nZONE", col = "goldenrod4", cex = 1, font = 2)
+
+# true curves
+lines(x_seq, 3 + 0.01 * x_seq^2, col = "firebrick", lwd = 1, lty = 1)
+lines(x_seq, 0.01 * x_seq^2, col = "steelblue", lwd = 1, lty = 1)
+
+legend("topleft",
+       legend = c("Treated data", "Control data", "Regression fit (linear)", "True curve"),
+       pch = c(16, 16, NA, NA), col = c("firebrick", "steelblue", "gray40", "gray40"),
+       lty = c(NA, NA, 2, 1), lwd = c(NA, NA, 2, 1), bty = "n", cex = 0.8)
+```
+
+**What you see:** The yellow zone has no data from either group. Regression draws a straight line through it, but the true relationship is curved (solid lines). The straight-line extrapolation gives wrong answers in the gap. This is why overlap matters -- without it, regression (and any method) is guessing.
+
+**How to detect it:** Look at the distributions of covariates in the treated and control groups. If they barely overlap, regression is extrapolating. Love plots and histograms help.
+
+## 3.7 When Regression IS Unbiased Despite Misspecification
+
+There is one important special case where regression works even if the model is wrong.
+
+**If treatment is mean-independent of covariates** -- meaning $\mathbb{E}[Z \mid X] = \mathbb{E}[Z]$ (treatment assignment doesn't depend on $X$) -- then the regression coefficient $\hat{\tau}$ is unbiased for $\tau$ even if the true outcome model is nonlinear.
+
+**Why?** By FWL, the residual $\tilde{Z}_i = Z_i - \hat{\mathbb{E}}[Z \mid X_i]$. If $Z$ is independent of $X$, then $\hat{\mathbb{E}}[Z \mid X_i]$ is roughly constant, so $\tilde{Z}_i \approx Z_i - \bar{Z}$. This means $\tilde{Z}_i$ is uncorrelated with any function of $X$, including the omitted nonlinear part $g(X)$. So the bias term $\sum w_i g(X_i) \approx 0$.
+
+**When does this hold?** In a **randomized experiment**. Randomization makes $Z$ independent of $X$, which implies mean-independence. This is exactly why regression adjustment inside an experiment (Section 6) is unbiased even if the linear model is wrong -- the randomization guarantees that $\tilde{Z}$ is orthogonal to everything, including omitted nonlinearities.
+
+**When does it fail?** In an **observational study** where treatment depends on covariates. Then $\tilde{Z}_i$ is correlated with $X$, and any omitted nonlinearity in $g(X)$ creates bias.
+
+## 3.8 Key Limitations Summary
+
+Regression assumes:
+
+- **Linearity:** the relationship between background and outcome is a straight line
+- **Constant effects:** the treatment has the same effect on everyone
+- **No extrapolation:** there is enough overlap between treated and control groups
+- **No omitted variables:** all confounders are in the model
+
+If any of these fail, your treatment effect estimate can be wrong.
+
+---
+
+# 4. Week 2: Randomized Experiments -- The Gold Standard
+
+## 4.1 Why Randomization Fixes Everything
+
+In Week 1, we saw that regression can only balance what you put in the model. If you miss something, you are in trouble.
+
+Randomization takes a completely different approach: **instead of trying to statistically adjust for confounders, you make them irrelevant by randomly deciding who gets treated.**
+
+Think of it like shuffling a deck of cards and dealing to two piles. The piles will be roughly the same -- not because you carefully sorted them, but because the random process doesn't favor any particular card.
+
+When you randomly assign treatment:
+
+- The treated and control groups will be similar in age, gender, income, health, motivation, genetics, and **literally everything else** -- including things you didn't even think to measure
+- Any differences between the groups are just due to luck, and they get smaller as the sample gets bigger
+- You can make strong causal claims because the ONLY difference between the groups is the treatment
+
+## 4.2 The Completely Randomized Design
+
+**Setup:** You have $N$ people. You randomly pick $n_1$ of them to get the treatment. The remaining $n_0 = N - n_1$ are the control group.
+
+Every possible way of choosing $n_1$ people out of $N$ is equally likely. There are $\binom{N}{n_1}$ possible assignments (read "N choose n_1" -- this is the number of ways to pick $n_1$ items from $N$ total; for example, $\binom{10}{3} = 120$ means there are 120 ways to pick 3 people out of 10), and each has the same probability:
+
+$$\Pr(\mathbf{Z} = \mathbf{z}) = \binom{N}{n_1}^{-1}$$
+
+Each person has a $n_1/N$ chance of being treated.
+
+**Important detail:** The assignments are NOT independent across people. If I tell you person 1 got treated, that slightly lowers the chance person 2 got treated (because there are now fewer treatment "slots" left). This is because the total number treated is fixed at $n_1$.
+
+## 4.3 What Randomization Balances
+
+This is the key section. Randomization balances **everything**.
+
+### Balances averages of background characteristics
+
+For any background characteristic $X$ (age, income, whatever):
+
+$$\mathbb{E}[\bar{X}_T - \bar{X}_C] = 0$$
+
+### Balances ANY function of background characteristics
+
+For **any** function $g(X)$ -- could be $X^2$, could be $\log(X)$, could be some crazy nonlinear thing:
+
+$$\mathbb{E}[\bar{g}_T - \bar{g}_C] = 0$$
+
+Remember, regression could only balance the linear functions you put in the model. Randomization balances **everything** -- including functions you didn't know about.
+
+### Balances things you can't even see
+
+Let $U$ be some unmeasured characteristic (like genetic predisposition, or personality):
+
+$$\mathbb{E}[\bar{U}_T - \bar{U}_C] = 0$$
+
+This is the killer feature. Randomization handles confounders **you don't even know about**. No other method can do this.
+
+### Visualizing: Randomization Balances Everything (Including Unobserved Variables)
+
+```{r randomization-balance, fig.height=5}
+# ----- Population of 500 people with many covariates -----
+N <- 500
+n1 <- 250
+pop <- data.frame(
+  age      = rnorm(N, 40, 12),
+  income   = rnorm(N, 60000, 20000),
+  educ     = rpois(N, 14),
+  health   = rbeta(N, 5, 2) * 100,
+  secret_U = rnorm(N, 0, 1)  # UNOBSERVED confounder -- you'd never know this exists
+)
+
+# ----- Compute SMDs across 1000 randomizations -----
+n_sims <- 1000
+smd_mat <- matrix(NA, n_sims, 5)
+colnames(smd_mat) <- c("Age", "Income", "Education", "Health", "Unobserved U")
+
+for (s in 1:n_sims) {
+  Z <- rep(0, N); Z[sample(1:N, n1)] <- 1
+  for (j in 1:5) {
+    x <- pop[, j]
+    x_t <- x[Z == 1]; x_c <- x[Z == 0]
+    pooled_sd <- sqrt((var(x_t) + var(x_c)) / 2)
+    smd_mat[s, j] <- (mean(x_t) - mean(x_c)) / pooled_sd
+  }
+}
+
+# ----- Boxplot of SMDs -----
+par(mar = c(6, 4, 3, 1))
+boxplot(smd_mat, col = c(rep("steelblue", 4), "coral"),
+        main = "SMDs Across 1000 Randomizations",
+        ylab = "Standardized Mean Difference", las = 2)
+abline(h = 0, lty = 2, col = "gray50")
+abline(h = c(-0.1, 0.1), lty = 3, col = "firebrick")
+legend("topright", legend = c("Threshold: |SMD| < 0.1"),
+       lty = 3, col = "firebrick", bty = "n", cex = 0.8)
+```
+
+**What you see:** ALL covariates -- including the unobserved one (coral) -- are tightly centered around SMD = 0. Randomization balances things you cannot see. No other method can do this.
+
+### Balance gets tighter with bigger samples
+
+Hoeffding's inequality says the probability of a big imbalance drops exponentially as $N$ grows:
+
+$$\Pr\left(|\bar{X}_T - \bar{X}_C| > \epsilon\right) \le 2\exp\left(-\frac{2n_1 n_0}{N} \cdot \frac{\epsilon^2}{(b-a)^2}\right)$$
+
+where $(b-a)$ is the range of the covariate and $\epsilon$ is how much imbalance you are worried about. You do not need to memorize this formula. The takeaway: in large experiments, big accidental imbalances are astronomically unlikely.
+
+## 4.4 Regression vs. Randomization Comparison
+
+| | Regression | Randomization |
+|---|-----------|---------------|
+| Balances the covariates you include | Yes | Yes |
+| Balances nonlinear functions of covariates | **No** | Yes |
+| Balances stuff you can't observe | **No** | Yes |
+| Requires a model to be correct | Yes | **No** |
+| Requires assumptions about the outcome | Yes | **No** |
+
+This is why randomized experiments are called the **gold standard** -- they handle everything regression can't.
+
+---
+
+# 5. Weeks 3--4: Potential Outcomes -- The Language of Causation
+
+This is the theoretical backbone of the course. Once you understand this framework, everything else clicks into place.
+
+## 5.1 The Two Imaginary Worlds
+
+For every person $i$ in your study, imagine two parallel universes:
+
+- **Universe 1:** Person $i$ gets the treatment. Their outcome in this universe is $Y_i(1)$.
+- **Universe 0:** Person $i$ does NOT get the treatment. Their outcome is $Y_i(0)$.
+
+These are called **potential outcomes**. They are fixed numbers -- not random. They are attributes of the person, like their height or birthday. They just describe what **would** happen in each scenario.
+
+**The causal effect of treatment on person $i$:**
+
+$$\tau_i = Y_i(1) - Y_i(0)$$
+
+This is just: "how much better (or worse) off is this person with the treatment vs. without?"
+
+## 5.2 The Fundamental Problem
+
+Here is the catch: **you only get to live in one universe.** Each person either gets the treatment or doesn't. You observe $Y_i(1)$ if they got treated, or $Y_i(0)$ if they didn't. **Never both.**
+
+The outcome you actually observe is:
+
+$$Y_i^{\text{obs}} = Z_i \cdot Y_i(1) + (1 - Z_i) \cdot Y_i(0)$$
+
+If $Z_i = 1$: you see $Y_i(1)$. If $Z_i = 0$: you see $Y_i(0)$.
+
+This means **you can never compute the treatment effect for any single person**, because you are always missing one of the two numbers.
+
+This is called the **fundamental problem of causal inference**, and it is why the entire field exists.
+
+### Visualizing the Fundamental Problem
+
+```{r fundamental-problem, fig.height=4.5}
+# ----- Build a toy population of 8 people -----
+n_fp <- 8
+people <- data.frame(
+  id    = 1:n_fp,
+  Y1    = c(8, 6, 10, 4, 7, 9, 5, 11),
+  Y0    = c(5, 4, 6, 3, 5, 7, 4, 8),
+  tau   = NA
+)
+people$tau <- people$Y1 - people$Y0
+
+# ----- Randomly assign 4 to treatment -----
+treated_ids <- sample(1:n_fp, 4)
+people$Z <- ifelse(people$id %in% treated_ids, 1, 0)
+people$Y_obs <- ifelse(people$Z == 1, people$Y1, people$Y0)
+people$Y_missing <- ifelse(people$Z == 1, people$Y0, people$Y1)
+
+# ----- Plot: what God sees vs what we see -----
+par(mfrow = c(1, 2), mar = c(4, 4, 3, 1))
+
+# Left: GOD'S VIEW
+plot(1:n_fp, people$Y1, pch = 17, col = "firebrick", cex = 1.5, ylim = c(2, 12),
+     xlab = "Person", ylab = "Outcome", main = "God's View: Both Outcomes Known")
+points(1:n_fp, people$Y0, pch = 16, col = "steelblue", cex = 1.5)
+arrows(1:n_fp, people$Y0, 1:n_fp, people$Y1, length = 0.08, col = "gray40")
+legend("topleft", legend = c("Y(1): treated outcome", "Y(0): control outcome"),
+       pch = c(17, 16), col = c("firebrick", "steelblue"), bty = "n")
+mtext(paste("True ATE =", round(mean(people$tau), 2)), side = 3, line = 0, cex = 0.9)
+
+# Right: RESEARCHER'S VIEW
+plot(1:n_fp, people$Y_obs, pch = ifelse(people$Z == 1, 17, 16),
+     col = ifelse(people$Z == 1, "firebrick", "steelblue"),
+     cex = 1.5, ylim = c(2, 12),
+     xlab = "Person", ylab = "Outcome", main = "Our View: One Outcome Per Person")
+points(1:n_fp, people$Y_missing, pch = 4, col = "gray70", cex = 1.2)
+legend("topleft",
+       legend = c("Observed (treated)", "Observed (control)", "Missing (counterfactual)"),
+       pch = c(17, 16, 4), col = c("firebrick", "steelblue", "gray70"), bty = "n")
+tau_hat_fp <- mean(people$Y_obs[people$Z == 1]) - mean(people$Y_obs[people$Z == 0])
+mtext(paste("Estimated ATE =", round(tau_hat_fp, 2)), side = 3, line = 0, cex = 0.9)
+```
+
+**What you see:** The left panel is what we wish we had -- both potential outcomes for everyone. The right panel is reality. The gray X's are the counterfactual outcomes we never get to see. Our estimate bounces around the true ATE depending on which randomization we happened to get.
+
+## 5.3 The "Science" vs. the "Assignment"
+
+A key concept in this class is the strict separation between:
+
+1. **The Science** ($\mathcal{S}$): All the potential outcomes $\{Y_i(1), Y_i(0)\}$ for every person. These are **fixed, unknown numbers**. They are not random.
+
+2. **The Assignment** ($\mathbf{Z}$): The random process that determines who gets treated. This is the **only thing that is random** in the whole setup.
+
+All the probability and statistics in this framework come from the randomization of who gets treated, NOT from any randomness in the outcomes themselves.
+
+## 5.4 The Target: Finite-Population Average Treatment Effect (PATE)
+
+Since we can't get individual treatment effects, we aim for the **average** across everyone:
+
+$$\tau = \frac{1}{N}\sum_{i=1}^{N}\big[Y_i(1) - Y_i(0)\big]$$
+
+This is a fixed number (not random) because the potential outcomes are fixed.
+
+## 5.5 The Estimator: Difference in Means
+
+$$\hat{\tau} = \bar{Y}_T - \bar{Y}_C = \frac{1}{n_1}\sum_{i: Z_i=1} Y_i^{\text{obs}} - \frac{1}{n_0}\sum_{i: Z_i=0} Y_i^{\text{obs}}$$
+
+## 5.6 Neyman's Framework -- The Estimation Approach
+
+Jerzy Neyman developed a framework focused on **estimating** the average treatment effect and quantifying uncertainty.
+
+### Unbiasedness
+
+Under a completely randomized design:
+
+$$\mathbb{E}[\hat{\tau}] = \tau$$
+
+**Translation:** If you could repeat the experiment many times (re-randomizing each time), the average of all your estimates would be the true treatment effect.
+
+### Visualizing Unbiasedness: The Estimate Bounces, but Centers on Truth
+
+```{r unbiasedness-simulation, fig.height=4.5}
+# ----- Same 8 people, repeat the experiment 5000 times -----
+n_ub <- 8
+Y1_ub <- c(8, 6, 10, 4, 7, 9, 5, 11)
+Y0_ub <- c(5, 4, 6,  3, 5, 7, 4, 8)
+true_ate_ub <- mean(Y1_ub - Y0_ub)
+
+n_sims <- 5000
+estimates_ub <- numeric(n_sims)
+
+for (s in 1:n_sims) {
+  Z <- rep(0, n_ub)
+  Z[sample(1:n_ub, 4)] <- 1
+  Y_obs <- ifelse(Z == 1, Y1_ub, Y0_ub)
+  estimates_ub[s] <- mean(Y_obs[Z == 1]) - mean(Y_obs[Z == 0])
+}
+
+# ----- Histogram -----
+hist(estimates_ub, breaks = 30, col = "lightblue", border = "white",
+     main = "Distribution of Estimated ATE Across 5000 Randomizations",
+     xlab = expression(hat(tau)), probability = TRUE)
+abline(v = true_ate_ub, col = "firebrick", lwd = 3, lty = 1)
+abline(v = mean(estimates_ub), col = "steelblue", lwd = 2, lty = 2)
+legend("topright",
+       legend = c(
+         paste("True ATE =", round(true_ate_ub, 2)),
+         paste("Mean of estimates =", round(mean(estimates_ub), 2))
+       ),
+       col = c("firebrick", "steelblue"), lwd = c(3, 2), lty = c(1, 2), bty = "n")
+```
+
+**What you see:** Each bar is a possible estimate. Some are too high, some too low. But the CENTER of the distribution lands on the true ATE (red line). That is unbiasedness.
+
+**The mechanism:** Randomization makes each person equally likely to be in the treated group. So the treated group mean is an unbiased estimate of $\bar{Y}(1)$, and the control group mean is an unbiased estimate of $\bar{Y}(0)$. No modeling assumptions needed.
+
+### How much does the estimate bounce around? (Neyman's Exact Variance)
+
+First, some building blocks. Define these **finite-population variances**:
+
+$$S_1^2 = \frac{1}{N-1}\sum_{i=1}^{N}\big(Y_i(1) - \bar{Y}(1)\big)^2 \quad\text{(spread of treated potential outcomes)}$$
+
+$$S_0^2 = \frac{1}{N-1}\sum_{i=1}^{N}\big(Y_i(0) - \bar{Y}(0)\big)^2 \quad\text{(spread of control potential outcomes)}$$
+
+$$S_\tau^2 = \frac{1}{N-1}\sum_{i=1}^{N}(\tau_i - \tau)^2 \quad\text{(treatment effect heterogeneity)}$$
+
+Think of $S_\tau^2$: if a drug lowers blood pressure by exactly 10 points for everyone, $S_\tau^2 = 0$ (constant effect). If it lowers by 20 for some and does nothing for others, $S_\tau^2$ is large.
+
+**Neyman's exact variance formula:**
+
+$$\text{Var}(\hat{\tau}) = \frac{S_1^2}{n_1} + \frac{S_0^2}{n_0} - \frac{S_\tau^2}{N}$$
+
+**Read it in pieces:**
+
+- $S_1^2 / n_1$: Sampling noise from the treated group. More people = less noise.
+- $S_0^2 / n_0$: Same for control.
+- $-S_\tau^2 / N$: When treatment effects vary a lot, the variance is actually *smaller*. Why? Because heterogeneous effects create a negative correlation between $\bar{Y}_T$ and $\bar{Y}_C$. When the high-$\tau$ people land in treated, $\bar{Y}_T$ goes up but their absence pushes $\bar{Y}_C$ down. The difference doesn't move as much.
+
+### The problem with $S_\tau^2$ (and $S_{10}$)
+
+$S_\tau^2$ requires knowing $\tau_i = Y_i(1) - Y_i(0)$ for every person -- which requires seeing **both** potential outcomes. We never have that.
+
+**There is an algebraic identity:**
+
+$$S_\tau^2 = S_1^2 + S_0^2 - 2S_{10}$$
+
+where $S_{10} = \frac{1}{N-1}\sum_{i=1}^{N}\big(Y_i(1) - \bar{Y}(1)\big)\big(Y_i(0) - \bar{Y}(0)\big)$ is the **covariance** between treated and control potential outcomes.
+
+**Why $S_{10}$ is unidentifiable:** To compute it you need $Y_i(1)$ AND $Y_i(0)$ for the same person. You only ever see one. So $S_{10}$ is forever unknown, which means $S_\tau^2$ is also forever unknown.
+
+**Alternate form of Neyman's variance (using $S_{10}$):** Substituting $S_\tau^2 = S_1^2 + S_0^2 - 2S_{10}$:
+
+$$\text{Var}(\hat{\tau}) = \frac{n_0}{n_1 N}S_1^2 + \frac{n_1}{n_0 N}S_0^2 + \frac{2}{N}S_{10}$$
+
+Same variance, different form. Makes the role of $S_{10}$ explicit.
+
+### The conservative workaround -- and WHY it is ALWAYS valid
+
+**Step 1:** $S_\tau^2$ is a variance. Variances are sums of squared deviations. Squares are always non-negative. Therefore: $S_\tau^2 \ge 0$.
+
+**Step 2:** Since $S_\tau^2 \ge 0$, the term $-S_\tau^2/N \le 0$. So:
+
+$$\text{Var}(\hat{\tau}) = \frac{S_1^2}{n_1} + \frac{S_0^2}{n_0} - \frac{S_\tau^2}{N} \le \frac{S_1^2}{n_1} + \frac{S_0^2}{n_0}$$
+
+**Step 3:** We CAN estimate $S_1^2$ and $S_0^2$ from the data:
+
+$$s_1^2 = \frac{1}{n_1-1}\sum_{i:Z_i=1}(Y_i^{\text{obs}} - \bar{Y}_T)^2, \quad s_0^2 = \frac{1}{n_0-1}\sum_{i:Z_i=0}(Y_i^{\text{obs}} - \bar{Y}_C)^2$$
+
+**Step 4: Neyman's conservative variance estimator:**
+
+$$\widehat{\text{Var}}(\hat{\tau}) = \frac{s_1^2}{n_1} + \frac{s_0^2}{n_0}$$
+
+This **overestimates** the true variance because it pretends $S_\tau^2 = 0$.
+
+### Visualizing: Exact vs Conservative Variance
+
+```{r neyman-variance, fig.height=4.5}
+# ----- Population with heterogeneous treatment effects -----
+N_nv <- 200
+Y0_nv <- rnorm(N_nv, mean = 50, sd = 10)
+tau_nv <- rnorm(N_nv, mean = 5, sd = 4)  # heterogeneous effects
+Y1_nv <- Y0_nv + tau_nv
+true_ate_nv <- mean(tau_nv)
+
+S1_sq <- var(Y1_nv); S0_sq <- var(Y0_nv); S_tau_sq <- var(tau_nv)
+n1_nv <- 100; n0_nv <- 100
+
+exact_var    <- S1_sq / n1_nv + S0_sq / n0_nv - S_tau_sq / N_nv
+conserv_var  <- S1_sq / n1_nv + S0_sq / n0_nv
+
+# simulate to confirm
+n_sims_nv <- 5000
+ests_nv <- numeric(n_sims_nv)
+var_ests_nv <- numeric(n_sims_nv)
+
+for (s in 1:n_sims_nv) {
+  idx_t <- sample(1:N_nv, n1_nv)
+  Z <- rep(0, N_nv); Z[idx_t] <- 1
+  Y_obs <- ifelse(Z == 1, Y1_nv, Y0_nv)
+  ests_nv[s] <- mean(Y_obs[Z == 1]) - mean(Y_obs[Z == 0])
+  var_ests_nv[s] <- var(Y_obs[Z == 1]) / n1_nv + var(Y_obs[Z == 0]) / n0_nv
+}
+
+par(mar = c(5, 6, 3, 1))
+vals_nv <- c(var(ests_nv), exact_var, mean(var_ests_nv))
+names(vals_nv) <- c("Actual Var\n(simulation)", "Exact Formula\n(has S_tau^2)", "Conservative\n(drops S_tau^2)")
+bp <- barplot(vals_nv, col = c("steelblue", "seagreen", "coral"),
+        main = "Neyman Variance: Exact vs Conservative",
+        ylab = "Variance", las = 1, ylim = c(0, max(vals_nv) * 1.3))
+text(bp, vals_nv, labels = round(vals_nv, 4), pos = 3, cex = 0.9)
+```
+
+**What you see:** The coral bar (conservative) is always taller than the green bar (exact). The gap is $S_\tau^2/N$. The conservative estimator overestimates variance, which makes CIs wider than needed -- but never too narrow.
+
+### When is the conservative estimator exact?
+
+When $S_\tau^2 = 0$, meaning the treatment effect is **constant** -- the same for everyone: $Y_i(1) = Y_i(0) + \tau$ for all $i$.
+
+### Visualizing: Constant vs Heterogeneous Effects
+
+```{r constant-vs-hetero, fig.height=4.5}
+N_ch <- 200
+Y0_ch <- rnorm(N_ch, 50, 10)
+
+par(mfrow = c(1, 2), mar = c(4, 4, 3, 1))
+
+# Constant effects
+Y1_const <- Y0_ch + 5
+tau_const <- Y1_const - Y0_ch
+plot(Y0_ch, Y1_const, pch = 16, col = adjustcolor("steelblue", 0.5), cex = 0.8,
+     main = expression("Constant Effects: " * tau[i] * " = 5 for all"),
+     xlab = "Y(0)", ylab = "Y(1)")
+abline(a = 5, b = 1, col = "firebrick", lwd = 2)
+mtext(paste("S_tau^2 =", round(var(tau_const), 4)), side = 3, line = 0, cex = 0.8)
+
+# Heterogeneous effects
+tau_hetero_ch <- rnorm(N_ch, 5, 4)
+Y1_hetero <- Y0_ch + tau_hetero_ch
+plot(Y0_ch, Y1_hetero, pch = 16, col = adjustcolor("coral", 0.5), cex = 0.8,
+     main = expression("Heterogeneous Effects: " * tau[i] * " varies"),
+     xlab = "Y(0)", ylab = "Y(1)")
+abline(a = 5, b = 1, col = "firebrick", lwd = 2, lty = 2)
+mtext(paste("S_tau^2 =", round(var(tau_hetero_ch), 2)), side = 3, line = 0, cex = 0.8)
+```
+
+**What you see:** Left: under constant effects, every person's Y(1) is exactly 5 above their Y(0) -- all points on the line. $S_\tau^2 = 0$, conservative estimator is exact. Right: with heterogeneous effects, points scatter. $S_\tau^2 > 0$, conservative estimator overestimates.
+
+**Check it with the identity:** If effects are constant, adding a constant to every value doesn't change the spread, so $S_1^2 = S_0^2$. Also $Y_i(1)$ moves in perfect lockstep with $Y_i(0)$, so $S_{10} = S_1^2$. Plug in: $S_\tau^2 = S_1^2 + S_1^2 - 2S_1^2 = 0$.
+
+### The 95% Confidence Interval -- WHY It Covers 95%
+
+$$\hat{\tau} \pm 1.96\sqrt{\widehat{\text{Var}}(\hat{\tau})}$$
+
+**The logic chain (three pieces):**
+
+**PIECE 1: The Finite-Population CLT.** Under complete randomization, as the sample size grows:
+
+$$\frac{\hat{\tau} - \tau}{\sqrt{\text{Var}(\hat{\tau})}} \xrightarrow{d} N(0,1)$$
+
+The distribution of $\hat{\tau}$ across all possible randomizations is approximately a bell curve centered at $\tau$. The randomness comes purely from which $n_1$ people out of $N$ happen to get assigned to treatment -- NOT from assuming outcomes are normally distributed.
+
+**PIECE 2: The standard error quantifies the WIDTH of that bell curve.** We estimate it with $\sqrt{s_1^2/n_1 + s_0^2/n_0}$, which is **too big** (because we dropped $-S_\tau^2/N$).
+
+**PIECE 3: Putting it together.** For a standard normal, 95% of the mass is within $\pm 1.96$ SDs. Our SE is too big, so our interval is wider than needed, catching the true value **more often** than 95%:
+
+$$\Pr(\tau \in \text{CI}) \ge 95\%$$
+
+### Visualizing the 95% CI Coverage
+
+```{r ci-coverage, fig.height=5}
+# Compute CIs across many randomizations, check how often they cover tau
+covers_ci <- logical(n_sims_nv)
+
+for (s in 1:n_sims_nv) {
+  idx_t <- sample(1:N_nv, n1_nv)
+  Z <- rep(0, N_nv); Z[idx_t] <- 1
+  Y_obs <- ifelse(Z == 1, Y1_nv, Y0_nv)
+  tau_hat <- mean(Y_obs[Z == 1]) - mean(Y_obs[Z == 0])
+  se_hat <- sqrt(var(Y_obs[Z == 1]) / n1_nv + var(Y_obs[Z == 0]) / n0_nv)
+  ci_lo <- tau_hat - 1.96 * se_hat
+  ci_hi <- tau_hat + 1.96 * se_hat
+  covers_ci[s] <- (true_ate_nv >= ci_lo) & (true_ate_nv <= ci_hi)
+}
+
+coverage <- mean(covers_ci)
+
+# Show first 50 CIs
+par(mar = c(4, 5, 3, 1))
+show_n <- 50
+plot(NA, xlim = c(-5, 15), ylim = c(1, show_n), yaxt = "n",
+     xlab = expression(tau), ylab = "Randomization #",
+     main = paste0("95% CIs Across 50 Randomizations (actual coverage: ",
+                   round(coverage * 100, 1), "%)"))
+
+for (s in 1:show_n) {
+  idx_t <- sample(1:N_nv, n1_nv)
+  Z <- rep(0, N_nv); Z[idx_t] <- 1
+  Y_obs <- ifelse(Z == 1, Y1_nv, Y0_nv)
+  tau_hat <- mean(Y_obs[Z == 1]) - mean(Y_obs[Z == 0])
+  se_hat <- sqrt(var(Y_obs[Z == 1]) / n1_nv + var(Y_obs[Z == 0]) / n0_nv)
+  ci_lo <- tau_hat - 1.96 * se_hat
+  ci_hi <- tau_hat + 1.96 * se_hat
+  hit <- (true_ate_nv >= ci_lo) & (true_ate_nv <= ci_hi)
+  segments(ci_lo, s, ci_hi, s, col = ifelse(hit, "steelblue", "firebrick"), lwd = 1.5)
+  points(tau_hat, s, pch = 16, cex = 0.6, col = ifelse(hit, "steelblue", "firebrick"))
+}
+abline(v = true_ate_nv, col = "firebrick", lwd = 2, lty = 2)
+legend("topright", legend = c("Covers true ATE", "Misses true ATE"),
+       col = c("steelblue", "firebrick"), lwd = 2, bty = "n")
+```
+
+**What you see:** Each horizontal bar is a CI from one randomization. Blue bars cover the truth; red bars miss. Because we overestimate the SE, coverage is above 95%.
+
+**Summary of the logic chain:**
+
+1. Randomization + unbiasedness centers $\hat{\tau}$ around $\tau$
+2. The finite-population CLT says the distribution is approximately bell-shaped
+3. For a normal distribution, $\pm 1.96$ SDs covers 95%
+4. We overestimate the SD (because $S_\tau^2 \ge 0$ always), so we get $\ge$ 95% coverage
+5. This works for ANY population, ANY treatment effect distribution
+
+### Neyman vs. the classical two-sample t-test
+
+| | Neyman's approach | Classical t-test |
+|---|---------|-----------------|
+| What is random? | Only the treatment **assignment** | The **outcomes** themselves |
+| Are outcomes fixed or random? | Fixed | Random (draws from distributions) |
+| Where does the variance formula come from? | The randomization mechanism | A probability model for outcomes |
+| Does it pool variances? | No | Often yes |
+| Does it need normality? | No | Yes (or large sample) |
+
+## 5.7 Fisher's Framework -- The Testing Approach
+
+R.A. Fisher had a different approach. Instead of trying to estimate the treatment effect, he asked: **"Can I prove that the treatment did anything at all?"**
+
+### Fisher's Sharp Null Hypothesis
+
+$$H_0: Y_i(1) = Y_i(0) \quad \text{for ALL } i$$
+
+The treatment has **absolutely zero effect on every single person**. Under $H_0$, all potential outcomes are known ($= Y_i^{\text{obs}}$).
+
+### The Randomization Test
+
+1. Pick a test statistic $T$ (e.g., difference in means)
+2. Compute $T_{\text{obs}}$ from your actual data
+3. List all $\binom{N}{n_1}$ possible assignments
+4. For each one, compute $T$ (using the same outcomes, since under $H_0$ they don't change)
+5. p-value = fraction of assignments where $|T| \ge |T_{\text{obs}}|$
+
+**Why this is amazing:** Exact (no approximations), requires zero distributional assumptions, works in any sample size. Its validity depends ONLY on the randomization being real.
+
+### Visualizing Fisher's Randomization Test
+
+```{r fisher-test, fig.height=4.5}
+# ----- Small experiment: 8 people, 4 treated -----
+Y_obs_f <- c(8, 6, 7, 9, 4, 6, 5, 3)
+N_f <- 8; n1_f <- 4
+
+Z_obs_f <- c(1, 1, 1, 1, 0, 0, 0, 0)
+T_obs_f <- mean(Y_obs_f[Z_obs_f == 1]) - mean(Y_obs_f[Z_obs_f == 0])
+
+# Under sharp null: enumerate all choose(8,4) = 70 assignments
+combos <- combn(1:N_f, n1_f)
+T_all <- apply(combos, 2, function(idx) {
+  mean(Y_obs_f[idx]) - mean(Y_obs_f[-idx])
+})
+
+p_value_f <- mean(abs(T_all) >= abs(T_obs_f))
+
+# ----- Histogram of randomization distribution -----
+par(mar = c(4, 4, 3, 1))
+hist(T_all, breaks = 20, col = "lightblue", border = "white",
+     main = paste0("Fisher's Randomization Distribution (p = ", round(p_value_f, 3), ")"),
+     xlab = "Test Statistic (Difference in Means)", probability = TRUE)
+abline(v = T_obs_f, col = "firebrick", lwd = 3)
+abline(v = -T_obs_f, col = "firebrick", lwd = 3, lty = 2)
+legend("topright",
+       legend = c(paste("Observed T =", round(T_obs_f, 2)),
+                  paste("p-value =", round(p_value_f, 3))),
+       col = c("firebrick", NA), lwd = c(3, NA), bty = "n")
+```
+
+**What you see:** Under the sharp null, we know every possible test statistic value. The red line is what we observed. The p-value is the fraction at or beyond the red lines. No normality assumption needed.
+
+**Randomization tests are NOT the same as permutation tests.** They look identical computationally, but the justification is different. A permutation test assumes exchangeability (a distributional assumption). A randomization test relies on the fact that you actually randomized.
+
+## 5.8 Constant Additive Treatment Effects
+
+$$Y_i(1) = Y_i(0) + \tau \quad \text{for all } i$$
+
+### Testing a specific value of $\tau$
+
+Want to test $H_0: \tau = \tau_0$? Create adjusted outcomes: $Y_i^{(\tau_0)} = Y_i^{\text{obs}} - Z_i \cdot \tau_0$
+
+If the true effect is $\tau_0$, then the adjusted outcomes satisfy Fisher's sharp null. Run the randomization test on adjusted data.
+
+### Confidence Intervals by Inversion
+
+Try a bunch of values of $\tau_0$. For each one, run the test. Keep all non-rejected values:
+
+$$\mathcal{C}_{1-\alpha} = \{\tau_0 : p(\tau_0) > \alpha\}$$
+
+Properties: exact in finite samples, no normality assumptions, comes from the design.
+
+## 5.9 Choice of Test Statistics
+
+**Difference in means:** Best when outcomes are well-behaved. Sensitive to outliers.
+
+**Rank-based (Wilcoxon):** Uses ranks instead of raw values. More robust to outliers and skewed data.
+
+Both give exact p-values from the randomization distribution.
+
+## 5.10 Neyman vs. Fisher: Summary
+
+| | Neyman | Fisher |
+|---|--------|--------|
+| Goal | **Estimate** $\tau$ (number + CI) | **Test** whether $\tau = 0$ (p-value) |
+| Assumes constant effects? | No | Sharp null or constant effects |
+| Key output | $\hat{\tau} \pm \text{margin of error}$ | p-value |
+| Type of inference | Asymptotic (CLT-based) | Exact (enumerate all assignments) |
+
+Both are valid under randomization. They answer slightly different questions.
+
+---
+
+# 6. Addendum: Using Regression Inside an Experiment
+
+## 6.1 The Puzzle
+
+We just showed that $\hat{\tau} = \bar{Y}_T - \bar{Y}_C$ is already unbiased in a randomized experiment. So why bother running a regression?
+
+**Answer: Precision.** Regression doesn't change WHAT you are estimating -- it makes the estimate **less noisy**.
+
+## 6.2 How It Helps
+
+In any particular randomization, there will be some accidental imbalances (maybe the treated group happens to be slightly older). These imbalances add noise.
+
+Regression strips out the part of the outcome that is predictable from covariates, leaving a cleaner comparison. Think of it like noise-cancelling headphones for your estimate.
+
+## 6.3 Key Facts
+
+1. **Still unbiased**, even if the regression model is wrong. In a randomized experiment, $\hat{\tau}_{\text{reg}}$ is unbiased for $\tau$ regardless of whether the linear model is correctly specified. This is because randomization makes $Z$ mean-independent of $X$ (see Section 3.7), so the FWL residual $\tilde{Z}$ is uncorrelated with any function of $X$, including omitted nonlinearities. The bias term $\sum w_i g(X_i) \approx 0$ by the randomization.
+
+2. **Variance is smaller** (or at worst, the same) compared to the simple difference in means. The better covariates predict the outcome, the bigger the improvement.
+
+3. **Does not change the estimand.** You are still estimating the same $\tau$.
+
+## 6.4 The Bottom Line
+
+> In an experiment, regression adjustment is like blocking after the fact. It removes noise by accounting for covariate imbalances that arose by chance. It **refines** an already valid design -- it does not rescue a bad one.
+
+---
+
+# 7. Week 5: Observational Studies and Matching
+
+## 7.1 When You Can't Randomize
+
+Often you just can't randomly assign treatment:
+
+- You can't randomly make people smoke to study lung cancer (ethics)
+- You can't randomly assign kids to rich vs. poor families (impossible)
+- You can't randomize past events (the data already exists)
+
+But you still want to know the causal effect. What do you do?
+
+## 7.2 The Core Idea
+
+> An observational study is an attempt to **reconstruct the balance** that randomization would have created.
+
+Since you can't randomize, you try to find treated and control people who **look the same** on their background characteristics.
+
+**Three principles:**
+
+1. **Separate design from analysis.** Figure out how to make the groups comparable **before** you look at the outcomes.
+2. **Construct comparable groups.** Use matching (or other techniques).
+3. **Covariates refine, not rescue.** Covariates can improve a decent comparison, but they can't save a fundamentally flawed one.
+
+## 7.3 Matching
+
+**What it is:** Find pairs (or sets) of people -- one treated, one control -- who have similar background characteristics. Discard everyone who doesn't have a good match. Then compare outcomes within the matched sample.
+
+**It is a design tool, not an analysis tool.** Matching creates a new, better dataset.
+
+### Types of Matching
+
+**Exact matching:** Only match people with identical covariates. Perfect balance, but impossible in practice with continuous covariates.
+
+**Nearest-neighbor matching:** For each treated person, find the closest control.
+
+**Mahalanobis distance matching:** A smart distance that accounts for scale and correlation.
+
+**Propensity score matching:** Match on a single number summarizing the probability of being treated.
+
+**Optimal matching:** Minimizes total distance across ALL pairs simultaneously.
+
+### Visualizing Matching: Before and After
+
+```{r matching-visual, fig.height=4.5}
+# ----- Simple 1D matching example -----
+n_t_m <- 15; n_c_m <- 40
+X_t_m <- rnorm(n_t_m, 55, 8)
+X_c_m <- rnorm(n_c_m, 45, 8)
+
+# Nearest-neighbor matching
+matched_c_m <- numeric(n_t_m)
+for (i in 1:n_t_m) {
+  dists <- abs(X_c_m - X_t_m[i])
+  matched_c_m[i] <- which.min(dists)
+}
+X_c_matched_m <- X_c_m[matched_c_m]
+
+par(mfrow = c(1, 2), mar = c(4, 4, 3, 1))
+
+# Before matching
+plot(density(X_t_m), col = "firebrick", lwd = 2, xlim = range(c(X_t_m, X_c_m)),
+     main = "Before Matching", xlab = "Age (covariate)", ylim = c(0, 0.06))
+lines(density(X_c_m), col = "steelblue", lwd = 2)
+legend("topright", legend = c("Treated", "Control"),
+       col = c("firebrick", "steelblue"), lwd = 2, bty = "n")
+smd_before_m <- (mean(X_t_m) - mean(X_c_m)) / sqrt((var(X_t_m) + var(X_c_m)) / 2)
+mtext(paste("SMD =", round(smd_before_m, 3)), side = 1, line = 2.8, cex = 0.8)
+
+# After matching
+plot(density(X_t_m), col = "firebrick", lwd = 2, xlim = range(c(X_t_m, X_c_m)),
+     main = "After 1:1 Matching", xlab = "Age (covariate)", ylim = c(0, 0.06))
+lines(density(X_c_matched_m), col = "steelblue", lwd = 2)
+legend("topright", legend = c("Treated", "Matched Control"),
+       col = c("firebrick", "steelblue"), lwd = 2, bty = "n")
+smd_after_m <- (mean(X_t_m) - mean(X_c_matched_m)) / sqrt((var(X_t_m) + var(X_c_matched_m)) / 2)
+mtext(paste("SMD =", round(smd_after_m, 3)), side = 1, line = 2.8, cex = 0.8)
+```
+
+**What you see:** Before matching, the age distributions are shifted apart (large SMD). After matching, they overlap closely (SMD near 0). Matching created comparable groups.
+
+## 7.4 How Do You Know If Matching Worked?
+
+### Standardized Mean Difference (SMD)
+
+$$\text{SMD}(X) = \frac{\bar{X}_T - \bar{X}_C}{s_X}$$
+
+where $s_X = \sqrt{(s_T^2 + s_C^2)/2}$ is the pooled standard deviation.
+
+**Rules of thumb:**
+
+- $|\text{SMD}| < 0.1$: great balance
+- $|\text{SMD}| \approx 0.2$: okay but not great
+- $|\text{SMD}| > 0.25$: bad
+
+**Why not use a t-test?** Because t-test p-values depend on sample size. With a huge sample, even a tiny, meaningless difference will be "significant." SMD measures the **actual size** of the imbalance.
+
+### Variance Ratios
+
+$$\text{VR}(X) = \frac{\text{Var}(X_T)}{\text{Var}(X_C)}$$
+
+Should be close to 1.
+
+### Love Plots
+
+A visual tool. Plot SMDs before and after matching for each covariate. You want to see all the dots move close to zero.
+
+### Visualizing a Love Plot
+
+```{r love-plot, fig.height=5}
+# ----- Multi-covariate observational data -----
+N_lp <- 500
+covs_lp <- data.frame(
+  age       = rnorm(N_lp, 50, 10),
+  income    = rnorm(N_lp, 55000, 15000),
+  education = rpois(N_lp, 14),
+  male      = rbinom(N_lp, 1, 0.5),
+  married   = rbinom(N_lp, 1, 0.6)
+)
+
+lp_logit <- -2 + 0.03 * covs_lp$age - 0.00001 * covs_lp$income + 0.1 * covs_lp$education +
+      0.3 * covs_lp$male + 0.2 * covs_lp$married
+Z_lp <- rbinom(N_lp, 1, plogis(lp_logit))
+
+# SMDs before matching
+smd_before_lp <- sapply(covs_lp, function(x) {
+  (mean(x[Z_lp == 1]) - mean(x[Z_lp == 0])) / sqrt((var(x[Z_lp == 1]) + var(x[Z_lp == 0])) / 2)
+})
+
+# PS matching (simple NN on PS)
+ps_lp <- fitted(glm(Z_lp ~ ., data = cbind(covs_lp, Z_lp = Z_lp), family = binomial))
+t_idx_lp <- which(Z_lp == 1); c_idx_lp <- which(Z_lp == 0)
+matched_c_lp <- numeric(length(t_idx_lp))
+for (i in seq_along(t_idx_lp)) {
+  dists <- abs(ps_lp[c_idx_lp] - ps_lp[t_idx_lp[i]])
+  matched_c_lp[i] <- c_idx_lp[which.min(dists)]
+}
+
+smd_after_lp <- sapply(covs_lp, function(x) {
+  (mean(x[t_idx_lp]) - mean(x[matched_c_lp])) /
+    sqrt((var(x[t_idx_lp]) + var(x[matched_c_lp])) / 2)
+})
+
+# ----- Love Plot -----
+par(mar = c(4, 8, 3, 1))
+k_lp <- length(smd_before_lp)
+y_pos_lp <- k_lp:1
+
+plot(NA, xlim = c(-0.5, 0.5), ylim = c(0.5, k_lp + 0.5),
+     yaxt = "n", xlab = "SMD", ylab = "",
+     main = "Love Plot: Covariate Balance Before & After Matching")
+axis(2, at = y_pos_lp, labels = names(smd_before_lp), las = 1)
+abline(v = 0, lty = 1, col = "gray70")
+abline(v = c(-0.1, 0.1), lty = 3, col = "firebrick")
+
+points(smd_before_lp, y_pos_lp, pch = 1, col = "coral", cex = 1.5, lwd = 2)
+points(smd_after_lp, y_pos_lp, pch = 16, col = "steelblue", cex = 1.5)
+arrows(smd_before_lp, y_pos_lp, smd_after_lp, y_pos_lp, length = 0.08, col = "gray50")
+
+legend("topright", legend = c("Before matching", "After matching", "Threshold: 0.1"),
+       pch = c(1, 16, NA), col = c("coral", "steelblue", "firebrick"),
+       lty = c(NA, NA, 3), pt.lwd = c(2, 1, NA), bty = "n")
+```
+
+**What you see:** Open circles (before) are far from zero; filled circles (after) are within the dashed threshold lines. Arrows show the improvement. This is THE diagnostic you check in the design phase.
+
+## 7.5 Why Matching Reduces Bias
+
+Under a model where $Y_i = \tau Z_i + g(X_i) + \varepsilon_i$:
+
+$$\text{Bias} = \frac{1}{n_M}\sum_{i=1}^{n_M}\big(g(X_i) - g(X_{j(i)})\big)$$
+
+If the matched pair has similar covariates ($X_i \approx X_{j(i)}$), and $g$ is smooth, then $g(X_i) \approx g(X_{j(i)})$ and the bias from each pair is tiny.
+
+### The Chebyshev-type bias bound
+
+$$|\text{Bias}| \le L\big(|\Delta_X^M| + 2s_D\big)$$
+
+where:
+
+- $L$ = Lipschitz constant (max steepness of $g$). You cannot control this.
+- $\Delta_X^M$ = average covariate difference in matched pairs. You CAN control this.
+- $s_D$ = standard deviation of pairwise differences. You CAN control this.
+
+## 7.6 Exact Balance vs. Near-Fine Balance
+
+**Exact balance:** Distribution of a covariate is identical across groups. Hard to achieve for many covariates.
+
+**Near-fine balance:** Distributions are approximately equal (SMD < 0.1). Usually good enough.
+
+**Why the distinction matters:** Exact matching on a categorical variable (like race) can worsen balance on other covariates (forces within-category matches when categories are sparse). **Near-fine balance** relaxes this: enforces marginal distribution balance while allowing cross-category matches.
+
+## 7.7 Mahalanobis Distance and the Curse of Dimensionality
+
+$$d_M(X_i, X_j) = \sqrt{(X_i - X_j)^\top \hat{\Sigma}^{-1} (X_i - X_j)}$$
+
+Normalizes by the covariance matrix, putting all covariates on equal footing.
+
+**The curse of dimensionality:** As the number of covariates grows, all points become roughly equally far apart, so "nearest neighbor" is not actually close. This is why the propensity score (one dimension) becomes essential.
+
+**Hybrid approach:** Mahalanobis distance on key covariates + propensity score caliper.
+
+## 7.8 1:1 vs. 1:k Matching: The Bias-Variance Trade-off
+
+**1:1 matching:** Each treated unit paired with one control. Closer matches (less bias).
+
+**1:k matching (e.g., 1:2):** Each treated unit matched to $k$ controls. More data = lower variance, but matches are less close = potential for more bias.
+
+### Visualizing the Bias-Variance Trade-off
+
+```{r matching-1k, fig.height=4.5}
+N_t_1k <- 50; N_c_1k <- 200
+n_sims_1k <- 2000
+
+X_t_1k <- rnorm(N_t_1k, 55, 8)
+X_c_1k <- rnorm(N_c_1k, 45, 8)
+Y_c_1k <- 0.5 * X_c_1k + rnorm(N_c_1k, 0, 3)
+Y_t_1k <- 0.5 * X_t_1k + 5 + rnorm(N_t_1k, 0, 3)
+
+match_1k <- function(k) {
+  ests <- numeric(n_sims_1k)
+  for (s in 1:n_sims_1k) {
+    t_idx <- sample(1:N_t_1k, 30, replace = FALSE)
+    X_t <- X_t_1k[t_idx]; Y_t <- Y_t_1k[t_idx]
+    matched_Y <- numeric(30)
+    for (i in 1:30) {
+      dists <- abs(X_c_1k - X_t[i])
+      top_k <- order(dists)[1:k]
+      matched_Y[i] <- mean(Y_c_1k[top_k])
+    }
+    ests[s] <- mean(Y_t - matched_Y)
+  }
+  return(ests)
+}
+
+est_1_1k <- match_1k(1); est_2_1k <- match_1k(2); est_5_1k <- match_1k(5)
+
+par(mar = c(5, 4, 3, 1))
+boxplot(list("1:1" = est_1_1k, "1:2" = est_2_1k, "1:5" = est_5_1k),
+        col = c("steelblue", "mediumpurple", "coral"),
+        main = "1:k Matching: Bias-Variance Trade-off",
+        ylab = expression(hat(tau)), xlab = "Matching Ratio")
+abline(h = 5, lty = 2, col = "seagreen", lwd = 2)
+legend("topright", legend = "True ATE = 5", lty = 2, col = "seagreen", lwd = 2, bty = "n")
+
+for (i in 1:3) {
+  ests_i <- list(est_1_1k, est_2_1k, est_5_1k)[[i]]
+  mtext(paste0("Var=", round(var(ests_i), 2), " Bias=", round(mean(ests_i) - 5, 2)),
+        side = 1, at = i, line = 3, cex = 0.65)
+}
+```
+
+**What you see:** 1:1 has the widest box (highest variance) but centers closest to 5. 1:5 has a tighter box (lower variance) but may be pulled away from 5 (more bias). 1:2 is a common compromise. On the exam: `design = c(1,k)` in `kwaymatching()`.
+
+---
+
+# 8. Week 6: Making Observational Studies Work -- Assumptions and Propensity Scores
+
+## 8.1 The Problem: Selection Bias
+
+In observational data, if you just compare treated and untreated groups:
+
+$$\mathbb{E}[Y \mid Z=1] - \mathbb{E}[Y \mid Z=0] = \underbrace{\mathbb{E}[Y(1) - Y(0) \mid Z=1]}_{\text{causal effect on treated}} + \underbrace{\mathbb{E}[Y(0) \mid Z=1] - \mathbb{E}[Y(0) \mid Z=0]}_{\text{selection bias}}$$
+
+The **selection bias** is the difference in baseline outcomes between treated and control groups. It exists because people who choose treatment are different from those who don't, **even before treatment**.
+
+### Visualizing Selection Bias
+
+```{r selection-bias, fig.height=4.5}
+N_sb <- 1000
+health <- rnorm(N_sb, 50, 10)  # confounder
+Z_sb <- rbinom(N_sb, 1, plogis(-3 + 0.06 * health))  # healthier people exercise more
+Y0_sb <- 0.8 * health + rnorm(N_sb, 0, 5)
+Y1_sb <- Y0_sb + 3  # TRUE effect = exactly 3
+Y_sb <- ifelse(Z_sb == 1, Y1_sb, Y0_sb)
+
+naive_est <- mean(Y_sb[Z_sb == 1]) - mean(Y_sb[Z_sb == 0])
+selection_bias <- naive_est - 3
+
+par(mfrow = c(1, 2), mar = c(4, 4, 3, 1))
+
+# Panel 1: confounder distributions
+plot(density(health[Z_sb == 1]), col = "firebrick", lwd = 2, xlim = range(health),
+     main = "Confounder Distribution by Group",
+     xlab = "Health Score (confounder)")
+lines(density(health[Z_sb == 0]), col = "steelblue", lwd = 2)
+legend("topleft", legend = c("Treated (exercisers)", "Control (non-exercisers)"),
+       col = c("firebrick", "steelblue"), lwd = 2, bty = "n", cex = 0.8)
+mtext("Treated group is healthier at baseline!", cex = 0.7, col = "gray30")
+
+# Panel 2: decomposition
+vals_sb <- c(naive_est, 3, selection_bias)
+names(vals_sb) <- c("Naive\nEstimate", "True Causal\nEffect", "Selection\nBias")
+bp <- barplot(vals_sb, col = c("coral", "seagreen", "gray60"),
+        main = "Selection Bias Decomposition",
+        ylab = "Effect Size", ylim = c(0, max(vals_sb) * 1.3))
+text(bp, vals_sb, labels = round(vals_sb, 2), pos = 3)
+```
+
+**What you see:** The naive estimate (coral) is inflated because exercisers were already healthier. The true causal effect is 3 (green), but we see more because of selection bias (gray). This is why you need the methods from this class.
+
+## 8.2 SUTVA -- Making Sure the Question Even Makes Sense
+
+SUTVA (Stable Unit Treatment Value Assumption) has two parts:
+
+### Part 1: No interference between people
+
+Person $i$'s outcome depends only on whether **they** were treated, not on whether anyone else was.
+
+**When this fails:** Vaccination (herd immunity), social networks, classroom interventions.
+
+### Part 2: No hidden versions of treatment
+
+"Treatment" means one specific thing.
+
+**When this fails:** A "job training program" where some get 40 hours coaching and others get a 2-hour webinar.
+
+## 8.3 The Three Assumptions You Need
+
+### Assumption 1: Ignorability (No Unmeasured Confounders)
+
+$$(Y(1), Y(0)) \perp\!\!\!\perp Z \mid X$$
+
+Once you account for $X$, treatment assignment is essentially random. **Impossible to verify from data.** Must be justified by subject-matter knowledge.
+
+### Assumption 2: Overlap (Positivity)
+
+$$0 < \Pr(Z = 1 \mid X = x) < 1 \quad \text{for all } x$$
+
+For every type of person, there is a nonzero chance of being in either group. If some people are ALWAYS treated, there are no controls to compare them to.
+
+### Assumption 3: SUTVA
+
+No interference, no hidden versions (covered above).
+
+## 8.4 Identification: How These Assumptions Let You Estimate Causal Effects
+
+Under these three assumptions:
+
+$$\tau = \mathbb{E}\Big[\mathbb{E}[Y \mid Z=1, X] - \mathbb{E}[Y \mid Z=0, X]\Big]$$
+
+**The logic (important for the exam):**
+
+1. $\mathbb{E}[Y(1)] = \mathbb{E}\big[\mathbb{E}[Y(1) \mid X]\big]$ -- (tower property)
+2. $= \mathbb{E}\big[\mathbb{E}[Y(1) \mid Z=1, X]\big]$ -- (ignorability)
+3. $= \mathbb{E}\big[\mathbb{E}[Y \mid Z=1, X]\big]$ -- (consistency + overlap)
+
+Same for $Y(0)$. Subtracting: $\tau = \mathbb{E}\big[\mathbb{E}[Y \mid Z=1, X] - \mathbb{E}[Y \mid Z=0, X]\big]$.
+
+**The key insight:** Under these assumptions, you can replace **unobservable** potential outcomes with **observable** conditional means.
+
+## 8.5 The Propensity Score
+
+### What is it?
+
+$$e(X) = \Pr(Z = 1 \mid X)$$
+
+The probability of getting treated, given your background.
+
+### Why is it useful?
+
+**The Rosenbaum-Rubin Balancing Property:**
+
+$$(Y(1), Y(0)) \perp\!\!\!\perp Z \mid e(X)$$
+
+You don't need to match on all covariates. Just match on this single number. Within groups of people who have the same propensity score, covariates are balanced.
+
+It is the **coarsest balancing score** -- the simplest possible summary of $X$ that is sufficient for balance.
+
+### Visualizing the Propensity Score
+
+```{r propensity-score, fig.height=4.5}
+N_ps <- 600
+age_ps  <- rnorm(N_ps, 45, 10)
+male_ps <- rbinom(N_ps, 1, 0.5)
+inc_ps  <- rnorm(N_ps, 50000, 15000)
+
+lp_ps <- -3 + 0.04 * age_ps + 0.5 * male_ps + 0.00002 * inc_ps
+Z_ps <- rbinom(N_ps, 1, plogis(lp_ps))
+
+ps_model <- glm(Z_ps ~ age_ps + male_ps + inc_ps, family = binomial)
+ps_vals <- fitted(ps_model)
+
+par(mfrow = c(1, 2), mar = c(4, 4, 3, 1))
+
+# Panel 1: PS histograms by group
+hist(ps_vals[Z_ps == 1], breaks = 25, col = adjustcolor("firebrick", 0.5),
+     border = "white", probability = TRUE, xlim = c(0, 1),
+     main = "Propensity Score by Group",
+     xlab = expression(hat(e)(X)))
+hist(ps_vals[Z_ps == 0], breaks = 25, col = adjustcolor("steelblue", 0.5),
+     border = "white", probability = TRUE, add = TRUE)
+legend("topright", legend = c("Treated", "Control"),
+       fill = adjustcolor(c("firebrick", "steelblue"), 0.5), bty = "n")
+
+# Panel 2: balance within PS quintiles
+ps_quintile <- cut(ps_vals, breaks = quantile(ps_vals, probs = 0:5 / 5), include.lowest = TRUE)
+smd_overall <- (mean(age_ps[Z_ps == 1]) - mean(age_ps[Z_ps == 0])) /
+               sqrt((var(age_ps[Z_ps == 1]) + var(age_ps[Z_ps == 0])) / 2)
+smd_within <- sapply(levels(ps_quintile), function(q) {
+  idx <- ps_quintile == q
+  if (sum(Z_ps[idx] == 1) > 1 & sum(Z_ps[idx] == 0) > 1) {
+    a_t <- age_ps[idx & Z_ps == 1]; a_c <- age_ps[idx & Z_ps == 0]
+    (mean(a_t) - mean(a_c)) / sqrt((var(a_t) + var(a_c)) / 2)
+  } else NA
+})
+
+barplot(c(smd_overall, smd_within), col = c("coral", rep("steelblue", 5)),
+        main = "Age SMD: Before vs Within PS Quintiles",
+        ylab = "SMD (Age)", names.arg = c("Before", paste0("Q", 1:5)), las = 2)
+abline(h = c(-0.1, 0.1), lty = 3, col = "firebrick")
+```
+
+**What you see:** Left: PS distributions overlap -- good (overlap check)! Right: the overall age imbalance (coral) shrinks dramatically within each PS quintile (blue). The propensity score creates balance.
+
+### Estimating the propensity score
+
+In practice, use logistic regression:
+
+$$\Pr(Z = 1 \mid X) = \frac{\exp(\alpha + \beta^\top X)}{1 + \exp(\alpha + \beta^\top X)}$$
+
+**Important:** The goal is NOT prediction accuracy. The goal is **covariate balance** after matching or weighting.
+
+**How to interpret coefficients:** They tell you what predicts SELECTION into treatment, NOT causal effects. A large positive coefficient on age means older people are more likely to be treated.
+
+**Don't include instruments** (things that affect $Z$ but not $Y$) -- they increase variance without reducing bias.
+
+**Always check:** overlap (PS histograms) and balance (SMDs after matching/weighting).
+
+---
+
+# 9. Week 7: Estimating Causal Effects -- IPW, AIPW, and Diagnostics
+
+## 9.1 Design vs. Analysis: A Two-Phase Approach
+
+**Design phase (NO outcomes):** Estimate PS, match/weight, check balance (SMDs, Love plots, overlap). Iterate until balance is good.
+
+**Analysis phase (NOW use Y):** Estimate $\hat{\tau}$, build CI.
+
+**Why separate?** If you look at outcomes first, you might choose the method that gives the answer you want. This mirrors how clinical trials lock in the analysis plan before unblinding.
+
+### Visualizing the Pipeline
+
+```{r design-analysis, fig.height=6}
+par(mar = c(1, 1, 2, 1))
+plot(NA, xlim = c(0, 10), ylim = c(0, 10), xaxt = "n", yaxt = "n",
+     xlab = "", ylab = "", main = "The Observational Study Pipeline", bty = "n")
+
+# Design phase
+rect(0.5, 5.5, 4.5, 9.5, col = adjustcolor("steelblue", 0.15), border = "steelblue", lwd = 2)
+text(2.5, 9.2, "DESIGN PHASE", font = 2, col = "steelblue", cex = 1.1)
+text(2.5, 8.3, "Uses: X, Z only", cex = 0.8, col = "gray30")
+text(2.5, 7.6, "1. Estimate PS", cex = 0.8)
+text(2.5, 7.0, "2. Match / Weight", cex = 0.8)
+text(2.5, 6.4, "3. Check Balance (SMD)", cex = 0.8)
+text(2.5, 5.8, "4. Check Overlap", cex = 0.8)
+
+# Arrow
+arrows(2.5, 5.3, 2.5, 4.7, lwd = 3, col = "firebrick", length = 0.15)
+text(4.2, 5.0, "SACRED\nBOUNDARY", col = "firebrick", font = 2, cex = 0.8)
+
+# Analysis phase
+rect(0.5, 0.5, 4.5, 4.5, col = adjustcolor("seagreen", 0.15), border = "seagreen", lwd = 2)
+text(2.5, 4.2, "ANALYSIS PHASE", font = 2, col = "seagreen", cex = 1.1)
+text(2.5, 3.3, "NOW uses: Y", cex = 0.8, col = "gray30")
+text(2.5, 2.6, "5. Estimate ATE", cex = 0.8)
+text(2.5, 2.0, "6. Build 95% CI", cex = 0.8)
+text(2.5, 1.4, "7. Sensitivity Analysis", cex = 0.8)
+
+# DO NOT box
+rect(5.5, 5.5, 9.5, 9.5, col = adjustcolor("coral", 0.1), border = "coral", lwd = 2)
+text(7.5, 9.2, "DO NOT", font = 2, col = "firebrick", cex = 1.1)
+text(7.5, 8.3, "Look at Y during design", cex = 0.8)
+text(7.5, 7.6, "Compute ATE during design", cex = 0.8)
+text(7.5, 7.0, "Pick model based on result", cex = 0.8)
+text(7.5, 6.4, "This = fishing / p-hacking", cex = 0.8)
+
+# Analogy box
+rect(5.5, 0.5, 9.5, 4.5, col = adjustcolor("mediumpurple", 0.1), border = "mediumpurple", lwd = 2)
+text(7.5, 4.2, "ANALOGY", font = 2, col = "mediumpurple", cex = 1.1)
+text(7.5, 3.3, "Clinical trial:", cex = 0.8)
+text(7.5, 2.6, "Lock in the analysis plan", cex = 0.8)
+text(7.5, 2.0, "BEFORE unblinding the data", cex = 0.8)
+text(7.5, 1.4, "Same logic here.", cex = 0.8)
+```
+
+## 9.2 Subclassification (Stratification)
+
+Divide the sample into strata based on $\hat{e}(X)$:
+
+$$\hat{\tau}_{\text{strat}} = \sum_{k=1}^{K} \frac{N_k}{N} \left(\bar{Y}_{T,k} - \bar{Y}_{C,k}\right)$$
+
+Cochran (1968): 5 subclasses remove ~90% of bias. More strata = less bias but noisier.
+
+## 9.3 Inverse Probability Weighting (IPW)
+
+IPW **reweights** every person so that the weighted groups look like a randomized experiment.
+
+### The intuition -- a concrete example
+
+- College-educated people: 80% enroll in training ($e(X) = 0.8$)
+- Non-college people: 20% enroll ($e(X) = 0.2$)
+
+The treated group is 80% college. That does NOT look like the population. IPW fixes this:
+
+- Treated college person: weight $1/0.8 = 1.25$ (over-represented, downweight)
+- Treated non-college person: weight $1/0.2 = 5$ (rare, upweight a lot)
+
+After reweighting, both groups look like the overall population.
+
+### The IPW estimator
+
+$$\hat{\tau}_{\text{IPW}} = \frac{1}{N}\sum_{i=1}^{N}\left[\frac{Z_i Y_i}{\hat{e}(X_i)} - \frac{(1-Z_i)Y_i}{1-\hat{e}(X_i)}\right]$$
+
+### Why IPW is unbiased (key proof)
+
+$$\mathbb{E}\left[\frac{Z_i Y_i}{e(X_i)}\right] = \mathbb{E}\left[\frac{e(X_i) \cdot \mathbb{E}[Y_i(1) \mid X_i]}{e(X_i)}\right] = \mathbb{E}[Y_i(1)]$$
+
+The propensity score cancels perfectly.
+
+### IPW achieves covariate balance as a theorem
+
+If the PS is correct, the IPW weighted covariate means converge to the same thing in both groups. **This is not a hope, it is a mathematical consequence.**
+
+**Proof sketch:** $\mathbb{E}\left[\frac{Z}{e(X)}g(X)\right] = \mathbb{E}\left[\frac{E[Z|X]}{e(X)}g(X)\right] = \mathbb{E}[g(X)]$ for any $g$.
+
+### Visualizing IPW: How Reweighting Creates Balance
+
+```{r ipw-weights, fig.height=4.5}
+N_ipw <- 500
+X_ipw <- rnorm(N_ipw, 0, 1)
+ps_true_ipw <- plogis(1.5 * X_ipw)
+Z_ipw <- rbinom(N_ipw, 1, ps_true_ipw)
+w_ipw <- ifelse(Z_ipw == 1, 1 / ps_true_ipw, 1 / (1 - ps_true_ipw))
+
+par(mfrow = c(1, 2), mar = c(4, 4, 3, 1))
+
+# Panel 1: PS vs weight
+plot(ps_true_ipw, w_ipw, pch = 16,
+     col = adjustcolor(ifelse(Z_ipw == 1, "firebrick", "steelblue"), 0.4),
+     cex = 0.7, log = "y",
+     main = "IPW Weight vs Propensity Score",
+     xlab = expression(e(X)), ylab = "Weight (log scale)")
+legend("top", legend = c("Treated", "Control"),
+       col = c("firebrick", "steelblue"), pch = 16, bty = "n")
+mtext("Near 0 or 1 = extreme weights!", cex = 0.7, col = "gray30")
+
+# Panel 2: balance before and after weighting
+mean_x_t_raw <- mean(X_ipw[Z_ipw == 1])
+mean_x_c_raw <- mean(X_ipw[Z_ipw == 0])
+mean_x_t_ipw <- sum(Z_ipw * X_ipw / ps_true_ipw) / sum(Z_ipw / ps_true_ipw)
+mean_x_c_ipw <- sum((1 - Z_ipw) * X_ipw / (1 - ps_true_ipw)) / sum((1 - Z_ipw) / (1 - ps_true_ipw))
+
+vals_ipw <- matrix(c(mean_x_t_raw, mean_x_c_raw, mean_x_t_ipw, mean_x_c_ipw),
+               nrow = 2, dimnames = list(c("Treated", "Control"), c("Unweighted", "IPW-Weighted")))
+barplot(vals_ipw, beside = TRUE, col = c("firebrick", "steelblue"),
+        main = "Covariate Mean of X by Group", ylab = "Mean of X")
+legend("topright", legend = c("Treated", "Control"),
+       fill = c("firebrick", "steelblue"), bty = "n")
+abline(h = mean(X_ipw), lty = 2, col = "seagreen", lwd = 2)
+legend("topleft", legend = "Population mean", lty = 2, col = "seagreen", lwd = 2, bty = "n")
+```
+
+**What you see:** Left: when PS is near 0 or 1, weights explode (note log scale). Right: before weighting, treated has higher X. After IPW, both match the population mean (green dashed).
+
+## 9.4 The Problem with Extreme Weights
+
+If $e(X) \approx 0$ or $1$, weights blow up. One person can dominate the entire estimate.
+
+### Visualizing Extreme Weights and the Overlap Problem
+
+```{r extreme-weights, fig.height=4.5}
+N_ew <- 400
+X_ew <- c(rnorm(200, -1, 0.8), rnorm(200, 1, 0.8))
+ps_ew <- plogis(2 * X_ew)
+Z_ew <- rbinom(N_ew, 1, ps_ew)
+Y0_ew <- 2 * X_ew + rnorm(N_ew, 0, 2)
+Y1_ew <- Y0_ew + 3
+Y_ew <- ifelse(Z_ew == 1, Y1_ew, Y0_ew)
+
+ipw_raw <- mean(Z_ew * Y_ew / ps_ew - (1 - Z_ew) * Y_ew / (1 - ps_ew))
+
+keep_ew <- ps_ew > 0.1 & ps_ew < 0.9
+ipw_trimmed <- mean(Z_ew[keep_ew] * Y_ew[keep_ew] / ps_ew[keep_ew] -
+                    (1 - Z_ew[keep_ew]) * Y_ew[keep_ew] / (1 - ps_ew[keep_ew]))
+
+par(mfrow = c(1, 2), mar = c(4, 4, 3, 1))
+
+# Panel 1: PS histogram showing poor overlap
+hist(ps_ew[Z_ew == 1], breaks = 30, col = adjustcolor("firebrick", 0.5),
+     border = "white", probability = TRUE, xlim = c(0, 1),
+     main = "Poor Overlap: PS Distributions",
+     xlab = expression(hat(e)(X)), ylim = c(0, 5))
+hist(ps_ew[Z_ew == 0], breaks = 30, col = adjustcolor("steelblue", 0.5),
+     border = "white", probability = TRUE, add = TRUE)
+rect(0, 0, 0.1, 5, col = adjustcolor("gray", 0.3), border = NA)
+rect(0.9, 0, 1, 5, col = adjustcolor("gray", 0.3), border = NA)
+legend("top", legend = c("Treated", "Control", "Trim zone"),
+       fill = c(adjustcolor("firebrick", 0.5), adjustcolor("steelblue", 0.5),
+                adjustcolor("gray", 0.3)), bty = "n", cex = 0.8)
+
+# Panel 2: estimates
+vals_ew <- c(3, ipw_raw, ipw_trimmed)
+names(vals_ew) <- c("Truth", "Raw IPW", "Trimmed IPW\n(0.1 < PS < 0.9)")
+bp <- barplot(vals_ew, col = c("seagreen", "coral", "steelblue"),
+        main = "IPW with Good vs Poor Overlap",
+        ylab = expression(hat(tau)), ylim = c(min(0, min(vals_ew)) - 1, max(vals_ew) * 1.3))
+text(bp, vals_ew, labels = round(vals_ew, 2), pos = 3)
+abline(h = 3, lty = 2, col = "seagreen")
+```
+
+**What you see:** With poor overlap, raw IPW (coral) can be wildly off because a few extreme-weight people dominate. Trimming to the overlap region (blue) gives a much more stable estimate. Gray zones = where we trim.
+
+### Solutions to extreme weights
+
+**1. Trimming:** Drop people with extreme PS. Changes the estimand to the overlap subpopulation.
+
+**2. Stabilized weights:** $w_i^{stab} = Z_i \cdot \hat{p}/\hat{e}(X_i) + (1-Z_i)(1-\hat{p})/(1-\hat{e}(X_i))$ where $\hat{p} = n_1/N$. Multiplies by marginal probability of actual treatment.
+
+**3. Hajek estimator:**
+
+$$\hat{\tau}_{\text{Hajek}} = \frac{\sum Z_i Y_i / \hat{e}(X_i)}{\sum Z_i / \hat{e}(X_i)} - \frac{\sum (1-Z_i)Y_i / (1-\hat{e}(X_i))}{\sum (1-Z_i) / (1-\hat{e}(X_i))}$$
+
+Normalizes weights to sum to 1. Slightly biased but much lower variance.
+
+## 9.5 Augmented Inverse Probability Weighting (AIPW) -- The "Best of Both Worlds"
+
+AIPW (the **doubly robust** estimator) combines IPW with outcome modeling.
+
+| Method | What it needs | Weakness |
+|--------|--------------|----------|
+| Outcome regression | Outcome model correct | Wrong model = wrong answer |
+| IPW | PS model correct | Wrong PS = wrong answer; extreme weights |
+
+### The AIPW estimator
+
+$$\hat{\tau}_{\text{AIPW}} = \frac{1}{N}\sum_{i=1}^{N}\left[\hat{\mu}_1(X_i) - \hat{\mu}_0(X_i) + \frac{Z_i(Y_i - \hat{\mu}_1(X_i))}{\hat{e}(X_i)} - \frac{(1-Z_i)(Y_i - \hat{\mu}_0(X_i))}{1-\hat{e}(X_i)}\right]$$
+
+**4 terms:** (1) predicted outcome under treatment, (2) minus predicted under control = regression estimate. (3) IPW correction for treated residuals. (4) IPW correction for control residuals.
+
+**The self-correcting mechanism:**
+
+- If the regression is perfect: residuals are zero, IPW correction vanishes. PS doesn't even matter.
+- If the regression is terrible but PS is correct: IPW correction fixes it.
+- If both are pretty good: you get better than either alone.
+
+### The "doubly robust" property
+
+Consistent if **either** the outcome model or the PS model is correct. You get two shots at being right.
+
+### Visualizing AIPW: Double Robustness
+
+```{r aipw, fig.height=4.5}
+N_aipw <- 800
+X_aipw <- rnorm(N_aipw, 0, 1)
+ps_aipw <- plogis(0.5 * X_aipw)
+Z_aipw <- rbinom(N_aipw, 1, ps_aipw)
+Y0_aipw <- 2 + 3 * X_aipw + 0.5 * X_aipw^2 + rnorm(N_aipw, 0, 2)  # nonlinear
+Y1_aipw <- Y0_aipw + 4
+Y_aipw <- ifelse(Z_aipw == 1, Y1_aipw, Y0_aipw)
+
+# correct PS model
+ps_correct <- fitted(glm(Z_aipw ~ X_aipw, family = binomial))
+
+# WRONG outcome model (linear only, but truth is quadratic)
+mu1_wrong <- predict(lm(Y_aipw ~ X_aipw, subset = Z_aipw == 1),
+                     newdata = data.frame(X_aipw = X_aipw))
+mu0_wrong <- predict(lm(Y_aipw ~ X_aipw, subset = Z_aipw == 0),
+                     newdata = data.frame(X_aipw = X_aipw))
+
+ipw_est <- mean(Z_aipw * Y_aipw / ps_correct - (1 - Z_aipw) * Y_aipw / (1 - ps_correct))
+reg_est <- mean(mu1_wrong - mu0_wrong)
+aipw_est <- mean(mu1_wrong - mu0_wrong +
+                 Z_aipw * (Y_aipw - mu1_wrong) / ps_correct -
+                 (1 - Z_aipw) * (Y_aipw - mu0_wrong) / (1 - ps_correct))
+
+par(mar = c(6, 4, 3, 1))
+vals_aipw <- c(4, reg_est, ipw_est, aipw_est)
+names(vals_aipw) <- c("Truth", "Regression\n(WRONG model)", "IPW\n(correct PS)", "AIPW\n(wrong outcome,\ncorrect PS)")
+bp <- barplot(vals_aipw, col = c("seagreen", "coral", "steelblue", "mediumpurple"),
+        main = "AIPW Is Doubly Robust",
+        ylab = expression(hat(tau)), ylim = c(0, max(vals_aipw) * 1.3), las = 1)
+text(bp, vals_aipw, labels = round(vals_aipw, 2), pos = 3)
+abline(h = 4, lty = 2, col = "seagreen")
+mtext("Outcome model is WRONG (linear for nonlinear truth). PS model is CORRECT.",
+      side = 1, line = 4.5, cex = 0.8)
+```
+
+**What you see:** Regression alone (coral) is biased. IPW (blue) and AIPW (purple) both get close to truth because the PS is correct. AIPW would ALSO work if the PS were wrong but the outcome model were right. You only need ONE to be correct.
+
+## 9.6 Reading R Code on the Exam
+
+Practice problems Q26-Q30 ask you to interpret R code. Here is what each piece does:
+
+**Propensity score model:**
+```r
+glm(formula = Z ~ age + education + married, family = binomial, data = df)
+```
+Logistic regression predicting treatment from covariates. Fitted values = estimated PS.
+Coefficients describe SELECTION (who gets treated), NOT causal effects.
+
+**Distance structure for matching (approxmatch):**
+```r
+components <- list(mahal = c("age","education"), ps = "ps_logit")
+wgts <- c(1, 2)
+dist_str <- multigrp_dist_struc(df, "Z", components, wgts)
+```
+`wgts <- c(1, 2)` means PS gets **twice** the weight of Mahalanobis.
+
+**Matching:**
+```r
+res <- kwaymatching(dist_str, "Z", indexgroup = "treated", design = c(1,1), .data = df)
+```
+`design = c(1,1)` = 1:1 matching. `design = c(1,2)` = 1:2 matching.
+`exactmatchon = "race"` forces exact matching. `finebalanceVars = "race"` enforces marginal balance.
+
+**IPW in R:**
+```r
+tau_ipw <- mean(Z*Y/ps - (1-Z)*Y/(1-ps))
+```
+
+**AIPW in R:**
+```r
+tau_aipw <- mean(mu1 - mu0 + Z*(Y-mu1)/ps - (1-Z)*(Y-mu0)/(1-ps))
+```
+
+## 9.7 Diagnostics: How Do You Know It's Working?
+
+1. **SMDs** for every covariate. All should be below 0.1.
+2. **Variance ratios** close to 1.
+3. **Love plots** showing improvement.
+4. **Overlap:** PS histograms for treated vs control should overlap substantially.
+
+If balance is bad, the PS model needs improvement. Do NOT proceed to analysis with poor balance.
+
+## 9.8 All Methods Need the Same Assumptions
+
+```{r summary-foundation, fig.height=4}
+par(mar = c(1, 1, 2, 1))
+plot(NA, xlim = c(0, 10), ylim = c(0, 6), xaxt = "n", yaxt = "n",
+     xlab = "", ylab = "", bty = "n",
+     main = "All Methods Share the Same Foundation")
+
+rect(0.5, 0.3, 9.5, 1.8, col = adjustcolor("firebrick", 0.15), border = "firebrick", lwd = 2)
+text(5, 1.4, "ASSUMPTIONS: SUTVA + Ignorability + Overlap", font = 2, cex = 1)
+text(5, 0.7, "If these fail (especially ignorability), ALL methods give wrong answers.", cex = 0.8)
+
+methods <- c("Regression", "Matching", "Substrat.", "IPW", "AIPW")
+colors <- c("steelblue", "seagreen", "mediumpurple", "coral", "goldenrod")
+x_pos <- seq(1, 9, length = 5)
+for (i in 1:5) {
+  rect(x_pos[i] - 0.7, 2.3, x_pos[i] + 0.7, 4.3,
+       col = adjustcolor(colors[i], 0.2), border = colors[i], lwd = 2)
+  text(x_pos[i], 3.8, methods[i], font = 2, cex = 0.7, col = colors[i])
+}
+for (i in 1:5) arrows(x_pos[i], 2.3, x_pos[i], 1.8, length = 0.08, col = "gray50")
+
+texts <- c("Balances X\nlinearly", "Pairs similar\npeople", "Strata by\nPS", "Reweights\nby 1/PS", "Regression\n+ IPW fix")
+for (i in 1:5) text(x_pos[i], 3.0, texts[i], cex = 0.55)
+
+text(5, 5.2, "Different methods = different TOOLS, same REQUIREMENTS", cex = 0.9, font = 3)
+text(5, 4.7, "AIPW preferred: doubly robust (two chances to get it right)", cex = 0.7)
+```
+
+---
+
+# 10. Key Formulas Cheat Sheet
+
+## Notation Reference
+
+| Symbol | Plain English |
+|--------|-------------|
+| $Y_i(1), Y_i(0)$ | Potential outcomes (what happens with/without treatment) |
+| $Z_i$ | Treatment indicator (1 = treated, 0 = control) |
+| $X_i$ | Background characteristics (covariates) |
+| $Y_i^{\text{obs}}$ | The outcome you actually observe |
+| $\tau_i = Y_i(1) - Y_i(0)$ | Individual treatment effect |
+| $\tau$ | Average treatment effect across everyone |
+| $n_1, n_0, N$ | Number treated, number control, total |
+| $e(X)$ | Propensity score = $\Pr(Z=1 \mid X)$ |
+| $\bar{Y}_T, \bar{Y}_C$ | Average observed outcome in treated/control group |
+| $S_1^2, S_0^2$ | Variance of treated/control potential outcomes |
+| $S_\tau^2$ | Variance of individual treatment effects |
+
+## The Formulas
+
+**Observed outcome:**
+$$Y_i^{\text{obs}} = Z_i Y_i(1) + (1-Z_i)Y_i(0)$$
+
+**Average treatment effect (the thing we want):**
+$$\tau = \frac{1}{N}\sum_{i=1}^{N}\big[Y_i(1) - Y_i(0)\big]$$
+
+**Difference-in-means estimator (how we estimate it):**
+$$\hat{\tau} = \bar{Y}_T - \bar{Y}_C$$
+
+**Unbiasedness:** $\mathbb{E}[\hat{\tau}] = \tau$
+
+**Neyman's exact variance:**
+$$\text{Var}(\hat{\tau}) = \frac{S_1^2}{n_1} + \frac{S_0^2}{n_0} - \frac{S_\tau^2}{N}$$
+
+**Alternate variance form:**
+$$\text{Var}(\hat{\tau}) = \frac{n_0}{n_1 N}S_1^2 + \frac{n_1}{n_0 N}S_0^2 + \frac{2}{N}S_{10}$$
+
+**Conservative variance bound:** $\text{Var}(\hat{\tau}) \le \frac{S_1^2}{n_1} + \frac{S_0^2}{n_0}$
+
+**Neyman's variance estimator:**
+$$\widehat{\text{Var}}(\hat{\tau}) = \frac{s_1^2}{n_1} + \frac{s_0^2}{n_0}$$
+
+**KEY identity:** $S_\tau^2 = S_1^2 + S_0^2 - 2S_{10}$ ($S_{10}$ is unidentifiable)
+
+**95% CI:** $\hat{\tau} \pm 1.96\sqrt{\widehat{\text{Var}}(\hat{\tau})}$
+
+**FWL residuals:** $\tilde{Z}_i = Z_i - \hat{\mathbb{E}}[Z \mid X_i]$
+
+**Regression coefficient via FWL:**
+$$\hat{\tau} = \frac{\sum \tilde{Z}_i Y_i}{\sum \tilde{Z}_i^2}$$
+
+**Regression balances covariates:** $\sum w_i X_i = 0$
+
+**Misspecification bias:** $\text{Bias}(\hat{\tau}) = \sum w_i \, g(X_i)$
+
+**Fisher's p-value:** $p = \Pr\big(|T(\mathbf{Z})| \ge |T_{\text{obs}}| \mid H_0\big)$
+
+**Confidence set by inversion:** $\mathcal{C}_{1-\alpha} = \{\tau_0 : p(\tau_0) > \alpha\}$
+
+**SMD:** $\text{SMD}(X) = \frac{\bar{X}_T - \bar{X}_C}{\sqrt{(s_T^2 + s_C^2)/2}}$
+
+**Matching bias bound:** $|\text{Bias}(\hat{\tau}^M)| \le L(|\Delta_X^M| + 2s_D)$
+
+**Selection bias decomposition:**
+$$\mathbb{E}[Y|Z\!=\!1] - \mathbb{E}[Y|Z\!=\!0] = \text{ATT} + \big(\mathbb{E}[Y(0)|Z\!=\!1] - \mathbb{E}[Y(0)|Z\!=\!0]\big)$$
+
+**Identification under ignorability:**
+$$\tau = \mathbb{E}\big[\mathbb{E}[Y \mid Z\!=\!1, X] - \mathbb{E}[Y \mid Z\!=\!0, X]\big]$$
+
+**Ignorability:** $(Y(1), Y(0)) \perp\!\!\!\perp Z \mid X$
+
+**Overlap:** $0 < \Pr(Z=1 \mid X=x) < 1$ for all $x$
+
+**Propensity score:** $e(X) = \Pr(Z=1 \mid X)$
+
+**Balancing property:** $(Y(1), Y(0)) \perp\!\!\!\perp Z \mid e(X)$
+
+**IPW estimator:**
+$$\hat{\tau}_{\text{IPW}} = \frac{1}{N}\sum_{i=1}^{N}\left[\frac{Z_i Y_i}{\hat{e}(X_i)} - \frac{(1-Z_i)Y_i}{1-\hat{e}(X_i)}\right]$$
+
+**IPW unbiasedness key step:** $\mathbb{E}\left[\frac{Z_i Y_i}{e(X_i)}\right] = \mathbb{E}[Y_i(1)]$
+
+**Hajek (stabilized) estimator:**
+$$\hat{\tau}_{\text{Hajek}} = \frac{\sum \frac{Z_i Y_i}{\hat{e}(X_i)}}{\sum \frac{Z_i}{\hat{e}(X_i)}} - \frac{\sum \frac{(1-Z_i)Y_i}{1-\hat{e}(X_i)}}{\sum \frac{(1-Z_i)}{1-\hat{e}(X_i)}}$$
+
+**AIPW (doubly robust) estimator:**
+$$\hat{\tau}_{\text{AIPW}} = \frac{1}{N}\sum\left[\hat{\mu}_1(X_i) - \hat{\mu}_0(X_i) + \frac{Z_i(Y_i - \hat{\mu}_1(X_i))}{\hat{e}(X_i)} - \frac{(1-Z_i)(Y_i - \hat{\mu}_0(X_i))}{1-\hat{e}(X_i)}\right]$$
+
+**AIPW doubly robust:** Consistent if $\hat{\mu}_1, \hat{\mu}_0$ correct **OR** $\hat{e}$ correct
+
+**Subclassification:**
+$$\hat{\tau}_{\text{strat}} = \sum_{k=1}^{K}\frac{N_k}{N}\left(\bar{Y}_{T,k} - \bar{Y}_{C,k}\right)$$
+
+---
+
+# 11. Practice Questions with Answers
+
+## Q1: What is the fundamental problem of causal inference?
+
+**Answer:** The causal effect for a person is $\tau_i = Y_i(1) - Y_i(0)$: the difference between what happens with treatment and what happens without. The problem is that each person is either treated or not -- you see one potential outcome and the other is forever missing. You never observe both $Y_i(1)$ and $Y_i(0)$ for the same person, so individual causal effects are fundamentally unobservable. This is why we focus on estimating **average** effects.
+
+---
+
+## Q2: How does regression "adjust" for covariates? What does it balance, and what does it miss?
+
+**Answer:** By the FWL theorem, the regression coefficient on treatment is computed by first removing the linear effect of covariates from treatment, then correlating the residuals. This is equivalent to reweighting so that $\sum w_i X_i = 0$.
+
+Regression balances the covariates **included in the model** (linearly). It does NOT balance nonlinear functions ($X^2$), interactions, or unobserved variables. The bias equals $\sum w_i g(X_i)$ where $g(X)$ is the omitted part.
+
+---
+
+## Q3: Why are randomized experiments the gold standard?
+
+**Answer:** Randomization makes treatment assignment independent of all pre-treatment characteristics. This means treated and control groups are balanced on everything (observed, unobserved, linear, nonlinear). No modeling assumptions needed.
+
+---
+
+## Q4: Neyman's variance formula
+
+**Answer:** $\text{Var}(\hat{\tau}) = S_1^2/n_1 + S_0^2/n_0 - S_\tau^2/N$. We use $\widehat{\text{Var}} = s_1^2/n_1 + s_0^2/n_0$ (conservative, drops $-S_\tau^2/N$). Since $S_\tau^2 \ge 0$, this overestimates. Exact when effects are constant ($S_\tau^2 = 0$).
+
+---
+
+## Q5: Explain Fisher's randomization test step by step
+
+**Answer:**
+1. State null: $H_0: Y_i(1) = Y_i(0)$ for all $i$
+2. Under $H_0$, all potential outcomes known ($= Y_i^{\text{obs}}$)
+3. Choose test statistic (e.g., difference in means)
+4. Compute observed $T_{\text{obs}}$
+5. Enumerate all $\binom{N}{n_1}$ assignments
+6. For each, compute $T$ (outcomes don't change under $H_0$)
+7. p-value = proportion with $|T| \ge |T_{\text{obs}}|$
+
+Exact, no distributional assumptions, valid from randomization alone.
+
+---
+
+## Q6: What is SUTVA?
+
+**Answer:** (1) No interference -- person $i$'s outcome depends only on their own treatment. (2) No hidden versions of treatment. Without SUTVA, $Y_i(1)$ and $Y_i(0)$ are ambiguous.
+
+---
+
+## Q7: What is ignorability and why can't you test it?
+
+**Answer:** $(Y(1), Y(0)) \perp\!\!\!\perp Z \mid X$. Conditional on $X$, treatment is as-if-random. Untestable because it is a claim about unobserved potential outcomes. Must be justified by subject-matter knowledge.
+
+---
+
+## Q8: What is the propensity score and its balancing property?
+
+**Answer:** $e(X) = \Pr(Z=1 \mid X)$. Balancing property: $(Y(1), Y(0)) \perp\!\!\!\perp Z \mid e(X)$. Match on one number instead of all covariates. Coarsest balancing score.
+
+---
+
+## Q9: What is selection bias? When does it vanish?
+
+**Answer:** $\mathbb{E}[Y|Z\!=\!1] - \mathbb{E}[Y|Z\!=\!0] = \text{ATT} + \text{selection bias}$, where selection bias = $\mathbb{E}[Y(0)|Z\!=\!1] - \mathbb{E}[Y(0)|Z\!=\!0]$. Vanishes under randomization or conditional ignorability.
+
+---
+
+## Q10: Computation problem
+
+An A/B test assigns 5 of 10 users to a new interface. Observed sessions:
+
+- Treatment: 8, 6, 7, 9, 5
+- Control: 4, 6, 5, 3, 4
+
+**(a)** $\hat{\tau} = 7 - 4.4 = 2.6$
+
+**(b)** Under $H_0$, outcomes are fixed. There are $\binom{10}{5} = 252$ splits. p-value = fraction with $|T| \ge 2.6$.
+
+**(c)** $s_1^2 = 2.5$, $s_0^2 = 1.3$, $\widehat{\text{Var}} = 0.76$, SE $= 0.872$, 95% CI: $[0.89, 4.31]$
+
+---
+
+## Q11: Walk through the identification proof
+
+**Answer:** Start with $\mathbb{E}[Y(1)]$:
+1. $= \mathbb{E}[\mathbb{E}[Y(1)|X]]$ (tower property)
+2. $= \mathbb{E}[\mathbb{E}[Y(1)|Z\!=\!1,X]]$ (ignorability)
+3. $= \mathbb{E}[\mathbb{E}[Y|Z\!=\!1,X]]$ (consistency + overlap)
+
+Same for $Y(0)$. Subtract: $\tau = \mathbb{E}[\mathbb{E}[Y|Z\!=\!1,X] - \mathbb{E}[Y|Z\!=\!0,X]]$.
+
+---
+
+## Q12: What is IPW and why does it work?
+
+**Answer:** $\hat{\tau}_{\text{IPW}} = \frac{1}{N}\sum\left[\frac{Z_i Y_i}{\hat{e}(X_i)} - \frac{(1-Z_i)Y_i}{1-\hat{e}(X_i)}\right]$. Works because $\mathbb{E}[Z_i Y_i / e(X_i)] = \mathbb{E}[Y_i(1)]$ by tower property + ignorability. The PS cancels.
+
+---
+
+## Q13: What goes wrong with extreme weights?
+
+**Answer:** When $e(X) \approx 0$ or $1$, weights $1/e(X)$ blow up. One person dominates. Fixes: trimming, Hajek/stabilized weights, AIPW.
+
+---
+
+## Q14: What is AIPW and what makes it "doubly robust"?
+
+**Answer:** Combines regression + IPW correction. Consistent if EITHER the outcome model or the PS model is correct. If the regression is perfect, the IPW correction vanishes (residuals = 0). If the PS is perfect, the correction fixes bad regression.
+
+---
+
+## Q15: Why separate design from analysis?
+
+**Answer:** Design phase constructs comparable groups using only $X$ and $Z$ (no outcomes). Prevents specification searching. The boundary is sacred -- like pre-registering a clinical trial.
+
+---
+
+## Q16: Compare matching, IPW, subclassification, and AIPW
+
+| Method | How it works | Strength | Weakness |
+|--------|-------------|----------|----------|
+| Matching | Pairs similar people | Transparent, easy balance check | Discards unmatched data |
+| Subclassification | Stratify by PS | Simple, ~90% bias removal | Within-stratum heterogeneity |
+| IPW | Reweight by 1/PS | Uses all data, exact balance in theory | Extreme weights |
+| AIPW | Regression + IPW fix | Doubly robust, most efficient | Fails if both models wrong |
+
+All require SUTVA + ignorability + overlap.
+
+---
+
+## Q17: Why is $S_{10}$ unidentifiable?
+
+**Answer:** $S_{10}$ requires both $Y_i(1)$ and $Y_i(0)$ for the same person. We only ever see one. Since $S_\tau^2 = S_1^2 + S_0^2 - 2S_{10}$, $S_\tau^2$ is also unidentifiable. Under constant effects, $S_{10} = S_1^2$ and $S_\tau^2 = 0$.
+
+---
+
+## Q18: FWL and extrapolation
+
+**Answer:** FWL weights $w_i = \tilde{Z}_i / \sum \tilde{Z}_j^2$ are large at extremes when treated and control occupy different $X$ regions. The regression extrapolates across the gap. Always check covariate overlap.
+
+---
+
+## Q19: Wilcoxon vs difference-in-means in randomization framework
+
+**Answer:** Both are valid test statistics in Fisher's test. Difference-in-means: powerful for constant additive effects, sensitive to outliers. Wilcoxon: uses ranks, robust to outliers/skewness. Both have exact p-values.
+
+---
+
+## Q20: Full observational study pipeline
+
+1. Define question (treatment, outcome, population)
+2. List confounders (subject-matter knowledge)
+3. Estimate PS (logistic regression)
+4. Check overlap (PS histograms)
+5. Match or weight
+6. Check balance (SMDs < 0.1, Love plot)
+7. **NOW look at outcomes** -- estimate $\hat{\tau}$, build CI
+8. Sensitivity analysis
+
+Steps 3-6 = design phase (NO outcomes). Step 7 = analysis phase.
+
+---
+
+```{r session-info}
+sessionInfo()
+```
