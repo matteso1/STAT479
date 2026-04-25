@@ -1,0 +1,951 @@
+---
+title: "STAT 479: Quiz 3 Study Guide"
+subtitle: "Weeks 9-10: Unmeasured Confounding and Sensitivity Analysis"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    toc_depth: 3
+    theme: flatly
+    code_folding: show
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = TRUE,
+  warning = FALSE,
+  message = FALSE,
+  fig.width = 9,
+  fig.height = 5.5,
+  comment = "#>"
+)
+set.seed(479)
+```
+
+**Quiz 3: Thursday 3/26. Covers Weeks 9-10 only. Same format as previous quizzes.**
+**Note: The Appendix ("Mathematical and Computational Foundations") is NOT on the quiz.**
+
+---
+
+## How to Use This Guide
+
+Read it like a story. Every concept is explained in plain English first. The math follows. When you see a new term it will be defined in normal words before any formula appears. The goal is understanding first, formulas second.
+
+---
+
+# 1. The Big Picture: What Changed in Weeks 9-10?
+
+## What we assumed before (Weeks 1-8)
+
+Everything up to Week 8 relied on one big assumption called **strong ignorability**:
+
+$$\big(Y(1),\, Y(0)\big) \perp Z \mid X$$
+
+In plain English: **if you control for all the observed covariates X, treatment assignment is basically random.** The people who got treated and didn't get treated are comparable once you account for age, income, education, etc.
+
+This is a powerful but optimistic assumption. In real observational studies, it is almost never guaranteed. There are usually things you can't measure -- a person's motivation, their family support network, their risk tolerance, their genetic predispositions -- that influence both whether they get treated and what their outcome is.
+
+## The Week 9-10 question
+
+> **What can we still learn when treatment assignment may depend on things we didn't measure?**
+
+Two answers:
+1. Use **negative controls** to check whether unmeasured confounding is actually present
+2. Do **sensitivity analysis** to quantify how strong the unmeasured confounding would need to be to break your conclusion
+
+The goal is NOT to eliminate unmeasured confounding (you can't, without more assumptions). The goal is to be **transparent and honest** about how vulnerable your conclusion is.
+
+---
+
+# 2. The Problem: Omitted Variable Bias
+
+## Plain English
+
+Suppose you run a regression to estimate a treatment effect, but you left out an important variable U (because you didn't observe it). Your estimate of the treatment effect will be wrong in a systematic way. How wrong? It depends on two things:
+
+1. **How much does U affect the outcome?** (Is U a strong predictor of Y?)
+2. **How correlated is U with treatment, after adjusting for X?** (Do treated people tend to have higher/lower U than controls?)
+
+If either of those is zero, no problem. If both are nonzero, you have bias.
+
+## The formula
+
+True model (what's actually happening):
+$$Y_i = \tau Z_i + \beta X_i + \gamma U_i + \varepsilon_i$$
+
+What you estimate (because U is missing):
+$$Y_i = \alpha + \tilde{\tau} Z_i + \tilde{\beta} X_i + \tilde{\varepsilon}_i$$
+
+The omitted variable bias formula says:
+$$\tilde{\tau} \approx \tau + \underbrace{\gamma}_{\text{effect of U on Y}} \cdot \underbrace{\frac{\text{Cov}(Z_i, U_i \mid X_i)}{\text{Var}(Z_i \mid X_i)}}_{\text{how correlated Z and U are, given X}}$$
+
+The bias = (how much U affects Y) x (how correlated U is with treatment).
+
+## Concrete example: Job training and motivation
+
+Imagine studying a job training program. The unobserved variable U is "motivation."
+
+- More motivated people are more likely to enroll in the program (U affects Z)
+- More motivated people tend to earn more regardless of training (U affects Y)
+
+Even after matching on age, education, and prior earnings, the treated group may still have higher average motivation than the control group. So your estimated treatment effect mixes the real training effect with the motivation effect. You can't separate them just by adjusting for X.
+
+```{r omitted-variable-bias, fig.height=4.5}
+set.seed(479)
+n <- 300
+
+# U = unmeasured motivation (standardized)
+U <- rnorm(n)
+
+# X = observed covariate (education, say)
+X <- rnorm(n)
+
+# Treatment depends on both X and U
+Z <- rbinom(n, 1, plogis(-0.5 + 0.3*X + 0.8*U))
+
+# True treatment effect is 1
+tau_true <- 1
+Y <- tau_true * Z + 0.5*X + 1.5*U + rnorm(n, 0, 1)
+
+# What we estimate (wrong -- ignores U)
+biased_model <- lm(Y ~ Z + X)
+tau_biased <- coef(biased_model)["Z"]
+
+# What we would estimate if U were observed (right)
+correct_model <- lm(Y ~ Z + X + U)
+tau_correct <- coef(correct_model)["Z"]
+
+cat("True tau:          ", tau_true, "\n")
+cat("Biased estimate:   ", round(tau_biased, 3), "\n")
+cat("Correct estimate:  ", round(tau_correct, 3), "\n")
+cat("Bias:              ", round(tau_biased - tau_true, 3), "\n")
+```
+
+**What you see:** The biased estimate is inflated because motivated people both selected into treatment AND had better outcomes. The model without U absorbs that motivation effect into the treatment coefficient.
+
+---
+
+# 3. Strategy 1 -- Multiple Control Groups
+
+## Plain English
+
+If you can't measure U, one trick is to use two different control groups that you expect to differ in their levels of U. If the unmeasured confounder is affecting your estimates, the two comparisons (treated vs. control group 1, and treated vs. control group 2) should give you different answers.
+
+**Agreement between the two estimates = good sign**
+**Disagreement = warning that something unmeasured is going on**
+
+## Example setup
+
+Imagine a job training study:
+- T = people who enrolled in the program
+- C1 = people who applied but were not selected (lottery losers)
+- C2 = people who never applied at all
+
+C1 and C2 are both controls, but C1 (applicants) are probably more motivated than C2 (non-applicants). So E[U | C1] > E[U | C2].
+
+If U (motivation) is driving some of the earnings difference, then $\hat{\tau}_{T,C1}$ and $\hat{\tau}_{T,C2}$ will disagree. If they agree, there is less reason to worry about U.
+
+```{r multiple-controls, fig.height=4}
+set.seed(479)
+n_each <- 150
+
+# Treated group: high motivation
+U_T  <- rnorm(n_each, mean = 0.8)
+X_T  <- rnorm(n_each)
+Y_T  <- 2 + 0.5*X_T + 1.5*U_T + rnorm(n_each)   # true treatment effect = 2
+
+# C1 (applied but not selected): moderate motivation
+U_C1 <- rnorm(n_each, mean = 0.4)
+X_C1 <- rnorm(n_each)
+Y_C1 <- 0 + 0.5*X_C1 + 1.5*U_C1 + rnorm(n_each)
+
+# C2 (never applied): low motivation
+U_C2 <- rnorm(n_each, mean = -0.4)
+X_C2 <- rnorm(n_each)
+Y_C2 <- 0 + 0.5*X_C2 + 1.5*U_C2 + rnorm(n_each)
+
+# Naive comparison (no covariate adjustment for simplicity)
+est_T_C1 <- mean(Y_T) - mean(Y_C1)
+est_T_C2 <- mean(Y_T) - mean(Y_C2)
+
+cat("Estimated effect (T vs C1):", round(est_T_C1, 2), "\n")
+cat("Estimated effect (T vs C2):", round(est_T_C2, 2), "\n")
+cat("True treatment effect: 2\n")
+cat("Difference between estimates:", round(est_T_C2 - est_T_C1, 2),
+    "(suggests confounding)\n")
+
+# Visualize
+par(mfrow = c(1, 2), mar = c(4, 4, 3, 1))
+boxplot(list("Treated" = Y_T, "C1 (applied)" = Y_C1, "C2 (never applied)" = Y_C2),
+        main = "Outcome by Group",
+        ylab = "Outcome Y",
+        col = c("steelblue", "goldenrod", "tomato"))
+
+boxplot(list("C1 (applied)" = U_C1, "C2 (never applied)" = U_C2),
+        main = "Unmeasured U by Control Group",
+        ylab = "Motivation U (unobserved)",
+        col = c("goldenrod", "tomato"))
+mtext("C1 more motivated than C2 -> different confounding",
+      side = 1, line = 3, cex = 0.7)
+```
+
+---
+
+# 4. Strategy 2 -- Negative Controls
+
+## What is a negative control?
+
+A negative control is a variable -- either an outcome or an exposure -- that **should not be causally affected by the treatment**. If you still observe an association between treatment and this variable, something is wrong. That association must be coming from bias (unmeasured confounding, selection effects, etc.).
+
+Think of it as a **placebo test**: if your "treatment" is affecting things it physically cannot affect, that is a red flag that your treated and control groups differ in ways you haven't accounted for.
+
+## 4.1 Negative Control Outcomes
+
+A **negative control outcome** Y^NC is an outcome that the treatment literally cannot change.
+
+Formal definition: $Y^{NC}(1) = Y^{NC}(0)$ for all units. (The treatment has zero causal effect on this variable.)
+
+If you observe $E[Y^{NC} \mid Z=1] \neq E[Y^{NC} \mid Z=0]$, that difference cannot be causal. It must be selection bias. The same hidden factors creating that gap may also be biasing your main estimate.
+
+**Examples:**
+- Studying effect of job training on earnings: the participant's height is a negative control outcome. Training can't change your height. If trained participants are taller on average, that reveals the groups differ in background characteristics.
+- Studying effect of vaccination in pregnancy on birth outcomes: congenital anomalies are a negative control outcome. The vaccine happens after the anomalies develop, so it can't cause them. If vaccinated mothers have fewer anomalies, their group is just healthier overall -- that selection bias may also affect the birth weight estimate.
+
+## 4.2 Negative Control Exposures
+
+A **negative control exposure** A^NC is a variable that cannot possibly affect the outcome Y.
+
+Formal definition: $Y(a, a^{NC}) = Y(a, a'^{NC})$ for all values of $a^{NC}$. (Changes in A^NC don't change Y.)
+
+If A^NC is associated with Y anyway, that must come from confounding.
+
+**Examples:**
+- Studying effect of air pollution on mortality: **tomorrow's pollution level** is a negative control exposure. Tomorrow's pollution cannot cause today's death. If tomorrow's pollution predicts today's mortality, that means both are driven by some third factor (weather patterns, seasonal effects) -- the same confounding may affect the real pollution estimate.
+- Studying effect of job training on earnings: **eligibility for a different unrelated program** (that the person didn't attend) could be a negative control. If it still predicts earnings, hidden selection is at work.
+
+## 4.3 The Math Behind Negative Controls
+
+Suppose the true data-generating process involves an unmeasured confounder U:
+$$Y = \tau A + \gamma U + \varepsilon$$
+
+Let Y^NC be a negative control outcome satisfying:
+$$Y^{NC} = \delta U + \eta$$
+
+(Y^NC depends on U but not on A.)
+
+Then:
+$$E[Y^{NC} \mid A=1] - E[Y^{NC} \mid A=0] = \delta \big(E[U \mid A=1] - E[U \mid A=0]\big)$$
+
+If this difference is nonzero, then U is unequally distributed between treated and control groups -- which means the naive estimate of $\tau$ is biased. Negative controls give you an empirical signal that confounding is present.
+
+## 4.4 What Negative Controls Do and Don't Do
+
+**They do:**
+- Reveal whether unmeasured confounding is present
+- Show the direction the confounding might be pushing estimates
+- Tell you whether your treated and control groups differ beyond what X captures
+
+**They don't:**
+- Tell you the size of the bias
+- Fix the problem
+- Replace formal sensitivity analysis
+
+When negative controls are clean (no association with treatment), it increases your confidence in the study. When they show associations, proceed with caution.
+
+```{r negative-controls, fig.height=5}
+set.seed(479)
+n <- 400
+
+# Unmeasured confounder
+U <- rnorm(n)
+
+# Treatment depends on U (confounded)
+A <- rbinom(n, 1, plogis(-0.5 + 1.2*U))
+
+# True outcome model
+Y <- 1.5*A + 2*U + rnorm(n)
+
+# Negative control outcome: depends on U, NOT on A
+Y_nc <- 1.8*U + rnorm(n)   # height, or pre-treatment anomaly
+
+# Under no confounding this should be ~0
+nc_gap <- mean(Y_nc[A==1]) - mean(Y_nc[A==0])
+
+# Primary outcome naive estimate (biased)
+naive_est <- mean(Y[A==1]) - mean(Y[A==0])
+
+cat("=== Negative Control Diagnostic ===\n")
+cat("Gap in negative control outcome (should be 0 if no confounding):",
+    round(nc_gap, 3), "\n")
+cat("Naive treatment effect estimate:", round(naive_est, 3), "\n")
+cat("True treatment effect: 1.5\n")
+cat("Bias in naive estimate:", round(naive_est - 1.5, 3), "\n")
+
+par(mfrow = c(1, 2), mar = c(4, 4, 3, 1))
+
+# Panel 1: Negative control outcome by treatment
+boxplot(Y_nc ~ A,
+        names = c("Control (A=0)", "Treated (A=1)"),
+        col = c("tomato", "steelblue"),
+        main = "Negative Control Outcome by Treatment",
+        ylab = "Y^NC (treatment can't cause this)")
+abline(h = 0, lty = 2)
+text(1.5, max(Y_nc)*0.85,
+     paste0("Gap = ", round(nc_gap, 2), "\n(signals confounding)"),
+     col = "firebrick", cex = 0.85)
+
+# Panel 2: Primary outcome by treatment (inflated by confounding)
+boxplot(Y ~ A,
+        names = c("Control (A=0)", "Treated (A=1)"),
+        col = c("tomato", "steelblue"),
+        main = "Primary Outcome by Treatment",
+        ylab = "Y (what we care about)")
+text(1.5, max(Y)*0.85,
+     paste0("Naive est = ", round(naive_est, 2),
+            "\nTrue effect = 1.5\nBias = ", round(naive_est - 1.5, 2)),
+     col = "firebrick", cex = 0.85)
+```
+
+**What you see:** The negative control outcome shows a gap between treated and control even though A can't cause it. This flags that U is unbalanced between groups -- exactly the same imbalance that inflates the primary estimate.
+
+---
+
+# 5. Sensitivity Analysis: The Core Framework
+
+## 5.1 What Sensitivity Analysis Does
+
+Sensitivity analysis asks a very specific, humble question:
+
+> **How strong would an unmeasured confounder have to be to explain away our finding?**
+
+It does not prove there is no confounding. It does not produce a single pass/fail verdict. It translates "could there be unmeasured confounding?" into a more useful question: "how BIG would the unmeasured confounding need to be?"
+
+If the answer is "it would need to be unrealistically huge" -- your conclusion is robust. If the answer is "even a small amount of confounding could break it" -- be cautious.
+
+## 5.2 The Setup: Matched Pairs
+
+Sensitivity analysis is developed in the context of **matched pairs**. Here is the setup:
+
+- You have N units grouped into I **matched pairs**
+- Each pair has one treated unit (Z=1) and one control unit (Z=0)
+- Within each pair, the two units have similar observed covariates $X_{i1} \approx X_{i2}$
+- Pairs might still differ on unobserved variable U
+
+In a **randomized experiment** within matched pairs, each unit in a pair has exactly a 50% chance of being the treated one:
+$$\Pr(Z_{i1}=1,\, Z_{i2}=0) = \Pr(Z_{i1}=0,\, Z_{i2}=1) = \frac{1}{2}$$
+
+In an **observational study**, we don't know the treatment probabilities, and they might not be 1/2 -- they might depend on the unmeasured U.
+
+---
+
+# 6. Rosenbaum's Gamma (Γ) Model
+
+## Plain English
+
+Gamma (Γ) is the **sensitivity parameter**. It measures how much the odds of treatment can differ between two matched units because of unmeasured factors.
+
+- **Γ = 1**: Perfect random assignment within pairs. Both units have a 50% chance. No hidden bias.
+- **Γ = 1.5**: Within a pair, one unit could be up to 50% more likely (in odds terms) to be treated than the other, due to something unmeasured.
+- **Γ = 2**: One unit could be twice as likely (odds) to be treated as the other.
+- **Γ = 5**: One unit could have 5x the odds of treatment.
+
+The larger Γ is, the more hidden bias you are allowing.
+
+## The Math
+
+Within each pair i, let $\pi_{ij}$ = probability that unit j gets treated.
+
+The Γ-model says: the treatment odds ratio between the two units in a pair cannot exceed Γ:
+
+$$\frac{1}{\Gamma} \leq \frac{\pi_{i1}/(1-\pi_{i1})}{\pi_{i2}/(1-\pi_{i2})} \leq \Gamma$$
+
+When Γ = 1, both sides of the inequality collapse to 1, meaning $\pi_{i1} = \pi_{i2} = 1/2$ (random assignment). As Γ increases, we allow more and more imbalance.
+
+## Where does Γ come from?
+
+The model can be derived from a logistic assignment model. Suppose:
+$$\Pr(Z_{ij}=1 \mid X_{ij}, U_{ij}) \propto \exp(\alpha X_{ij} + \gamma U_{ij})$$
+
+If two units in a pair have the same observed covariates ($X_{i1} = X_{i2}$), their treatment odds ratio is:
+$$\frac{\pi_{i1}/(1-\pi_{i1})}{\pi_{i2}/(1-\pi_{i2})} = \exp\{\gamma(U_{i1} - U_{i2})\}$$
+
+If $|\gamma(U_{i1} - U_{i2})| \leq \log \Gamma$, then the odds ratio is bounded by Γ.
+
+**Translation:** Γ tells you the maximum multiplicative effect that an unmeasured covariate can have on the odds of treatment between two otherwise-similar people.
+
+**IMPORTANT:** Γ is NOT estimated from data. You choose a range of values for Γ and ask: "if hidden bias were this strong, what would happen to my conclusions?"
+
+```{r gamma-intuition, fig.height=4}
+# Visualize what different Gamma values imply for treatment probabilities
+Gammas <- c(1, 1.5, 2, 3, 5)
+
+par(mar = c(5, 5, 3, 2))
+plot(NULL, xlim = c(0.8, 5.2), ylim = c(0, 1),
+     xlab = "Gamma (sensitivity parameter)",
+     ylab = "Allowed treatment probability range",
+     main = "What Gamma means: range of Pr(treatment) within a matched pair",
+     xaxt = "n")
+axis(1, at = Gammas)
+
+for (g in Gammas) {
+  p_low  <- 1 / (1 + g)   # lower bound on pi
+  p_high <- g / (1 + g)   # upper bound on pi
+  x_pos  <- g
+  lines(c(x_pos, x_pos), c(p_low, p_high), lwd = 6, col = "steelblue")
+  points(x_pos, 0.5, pch = 16, cex = 1.2, col = "firebrick")
+  text(x_pos, p_high + 0.04, paste0("[", round(p_low,2), ", ", round(p_high,2), "]"),
+       cex = 0.7, col = "gray30")
+}
+abline(h = 0.5, lty = 2, col = "firebrick")
+legend("topright", legend = c("Allowed range", "Perfect randomization (0.5)"),
+       col = c("steelblue", "firebrick"), lwd = c(6, 1), lty = c(1, 2))
+```
+
+**What you see:** At Γ=1, both units in a pair must have exactly 50% treatment probability. As Γ grows, the treatment probability can deviate more from 50%, reflecting stronger hidden bias.
+
+---
+
+# 7. Test Statistics Under Hidden Bias
+
+## 7.1 The Pair Difference
+
+For each matched pair i, define the treated-minus-control difference in observed outcomes:
+$$D_i = \begin{cases} Y_{i1}^{obs} - Y_{i2}^{obs} & \text{if unit 1 is treated} \\ Y_{i2}^{obs} - Y_{i1}^{obs} & \text{if unit 2 is treated} \end{cases}$$
+
+This is positive when the treated unit had a better outcome than its matched control.
+
+## 7.2 The Sign Test
+
+The simplest test: just count how many pairs have a positive difference.
+
+$$S_i = \mathbf{1}\{D_i > 0\}, \quad T = \sum_{i=1}^{I} S_i$$
+
+Under random assignment (Γ=1) and the sharp null of no effect, each $S_i \sim \text{Bernoulli}(1/2)$, so $T \sim \text{Binomial}(I, 1/2)$.
+
+Under hidden bias (Γ > 1), the probability of a positive sign is no longer exactly 1/2 -- but the Γ-model bounds how far it can deviate.
+
+## 7.3 The Wilcoxon Signed-Rank Test
+
+More powerful than the sign test. Instead of just the sign, it also uses the **magnitude** of each difference:
+
+$$W = \sum_{i=1}^{I} R_i S_i$$
+
+where $R_i$ = rank of $|D_i|$ among all I pairs. Pairs with bigger differences get more weight.
+
+Under random assignment (Γ=1) and the sharp null:
+$$E[W] = \frac{1}{2}\sum_{i=1}^{I} R_i, \quad \text{Var}(W) = \frac{1}{4}\sum_{i=1}^{I} R_i^2$$
+
+---
+
+# 8. Worst-Case P-Values
+
+## Plain English
+
+Under the Γ-model, for any value of Γ, we compute the **worst-case p-value**: the largest p-value the null hypothesis could produce, across all treatment assignment mechanisms consistent with that Γ.
+
+If this worst-case p-value is still below 0.05, our finding is robust to that level of hidden bias.
+
+## The Bound
+
+Under the sharp null and the Γ-model, the probability of a positive sign $S_i = 1$ is bounded by the model:
+$$\frac{1}{1+\Gamma} \leq \Pr(S_i = 1 \mid \text{data}) \leq \frac{\Gamma}{1+\Gamma}$$
+
+For a **one-sided test where large T is evidence against the null**, the **worst-case scenario** (most favorable to the null, hardest to reject) is the one that makes T stochastically as **large** as possible -- so the observed T_obs looks unsurprising:
+$$\Pr(S_i = 1) = \frac{\Gamma}{1+\Gamma} \quad \text{for all pairs}$$
+
+This pushes the null distribution of T upward, toward T_obs, so the p-value $= \Pr(T^* \geq T_{obs})$ is maximized.
+
+## The Resulting P-Value Formula
+
+For the sign test, worst-case one-sided p-value (large T rejects):
+$$p_\Gamma^+ = \Pr\left(T^* \geq T_{obs}\right), \quad T^* \sim \text{Binomial}\!\left(I,\; \frac{\Gamma}{1+\Gamma}\right)$$
+
+For the Wilcoxon signed-rank test, a normal approximation using the same worst-case probability:
+$$E_\Gamma[W] = \frac{\Gamma}{1+\Gamma}\sum_{i}R_i, \quad \text{Var}_\Gamma(W) = \frac{\Gamma}{(1+\Gamma)^2}\sum_{i}R_i^2$$
+
+$$Z_\Gamma = \frac{W_{obs} - E_\Gamma[W]}{\sqrt{\text{Var}_\Gamma(W)}}, \quad p_\Gamma^+ \approx 1 - \Phi(Z_\Gamma)$$
+
+**Note on direction:** As Γ increases, $E_\Gamma[W]$ increases toward $W_{obs}$, so $Z_\Gamma$ decreases and $p_\Gamma^+$ increases -- confirming that more allowed hidden bias makes the result harder to call significant.
+
+---
+
+# 9. The Sensitivity Curve and Design Sensitivity
+
+## The Sensitivity Curve
+
+Compute $p_\Gamma$ for a range of Γ values. Plot Γ on the x-axis, $p_\Gamma$ on the y-axis. The curve starts at the usual p-value (when Γ=1) and rises monotonically as Γ increases.
+
+The **design sensitivity** Γ* is the value where the curve crosses 0.05 (or whatever significance level you use). It is the largest Γ for which you still reject the null.
+
+Interpretation of Γ*: "An unmeasured confounder would need to create odds ratios of at least Γ* within matched pairs in order to explain away the observed effect."
+
+```{r sensitivity-curve, fig.height=5}
+# Simulate a matched pairs study and draw a sensitivity curve
+
+set.seed(479)
+I <- 100   # number of pairs
+
+# True effect exists: treated outcomes tend to be higher
+D <- rnorm(I, mean = 0.6, sd = 1)   # pair differences (treated - control)
+
+# Observed sign test statistic
+S     <- as.integer(D > 0)
+T_obs <- sum(S)
+
+# Signed rank statistic
+R     <- rank(abs(D))
+W_obs <- sum(R * S)
+
+# Compute worst-case p-values across range of Gamma
+gammas <- seq(1, 4, by = 0.05)
+
+p_sign_vec  <- numeric(length(gammas))
+p_wrank_vec <- numeric(length(gammas))
+
+for (k in seq_along(gammas)) {
+  g   <- gammas[k]
+  # Worst-case for one-sided test (large T/W is evidence against null):
+  # Worst = hardest to reject = largest p-value.
+  # Pr(T* >= T_obs) is LARGEST when T* is stochastically LARGEST,
+  # i.e., when Pr(S_i=1) is LARGEST = Gamma/(1+Gamma).
+  p_s <- g / (1 + g)
+
+  # Sign test worst-case p-value: Pr(T* >= T_obs) with T* ~ Binom(I, p_s)
+  p_sign_vec[k] <- 1 - pbinom(T_obs - 1, I, p_s)
+
+  # Wilcoxon worst-case p-value (normal approximation)
+  # E[W] = p_s * sum(R), maximized at p_s = Gamma/(1+Gamma)
+  E_W   <- p_s * sum(R)
+  Var_W <- g / (1 + g)^2 * sum(R^2)
+  Z_g   <- (W_obs - E_W) / sqrt(Var_W)
+  p_wrank_vec[k] <- 1 - pnorm(Z_g)
+}
+
+# Find design sensitivities
+Gamma_star_sign  <- gammas[which(p_sign_vec  > 0.05)[1]]
+Gamma_star_wrank <- gammas[which(p_wrank_vec > 0.05)[1]]
+
+par(mar = c(5, 5, 3, 2))
+plot(gammas, p_sign_vec, type = "l", lwd = 2.5, col = "steelblue",
+     ylim = c(0, 1),
+     xlab = expression("Sensitivity parameter " * Gamma),
+     ylab = expression("Worst-case p-value " * p[Gamma]),
+     main = "Sensitivity Curve: How p-value grows with assumed hidden bias")
+lines(gammas, p_wrank_vec, lwd = 2.5, col = "seagreen")
+abline(h = 0.05, lty = 2, col = "firebrick", lwd = 1.5)
+abline(v = Gamma_star_sign,  lty = 3, col = "steelblue")
+abline(v = Gamma_star_wrank, lty = 3, col = "seagreen")
+legend("topleft",
+       legend = c("Sign test", "Wilcoxon signed-rank", "alpha = 0.05"),
+       col    = c("steelblue", "seagreen", "firebrick"),
+       lwd    = c(2.5, 2.5, 1.5),
+       lty    = c(1, 1, 2))
+text(Gamma_star_sign  + 0.1, 0.12,
+     paste0("Sign: Gamma* = ", round(Gamma_star_sign, 2)),
+     col = "steelblue", cex = 0.8, adj = 0)
+text(Gamma_star_wrank + 0.1, 0.22,
+     paste0("Wilcoxon: Gamma* = ", round(Gamma_star_wrank, 2)),
+     col = "seagreen", cex = 0.8, adj = 0)
+```
+
+**What you see:** Both curves start below 0.05 at Γ=1 (the study is significant). As Γ increases (more hidden bias is allowed), the worst-case p-value rises. The Wilcoxon test has higher design sensitivity (Gamma* is bigger) because it uses magnitude info, not just direction.
+
+---
+
+# 10. Interpreting Gamma in Practice
+
+## What specific values of Γ mean
+
+| Γ | Meaning |
+|---|---------|
+| 1.0 | No hidden bias. Random assignment within pairs. |
+| 1.2 | One unit in a pair could be 20% more likely to be treated (in odds) due to something unmeasured. Small departure from randomization. |
+| 1.5 | One unit could have 50% higher odds of treatment. Moderate. |
+| 2.0 | One unit could be twice as likely to be treated. Substantial. |
+| 5.0 | One unit could be 5x as likely to be treated. Very large. |
+
+## How to interpret a study's sensitivity
+
+**Scenario A:** Study is significant up to Γ = 3.5.
+Interpretation: An unmeasured confounder would have to more than triple the odds of treatment within matched pairs to explain away the effect. That's hard to believe in most contexts. **Robust conclusion.**
+
+**Scenario B:** Study becomes insignificant at Γ = 1.2.
+Interpretation: A tiny amount of hidden bias -- just a 20% difference in treatment odds -- could explain away the effect. **Fragile conclusion.**
+
+**Key point:** Interpreting Γ* requires substantive knowledge. You have to ask "is there a plausible unmeasured variable that could create odds differences of this size, in this context?"
+
+## The Narrative Example from Class: Job Training
+
+- 500 matched pairs, signed-rank test, one-sided p-value at Γ=1: **p = 0.001**
+- At Γ = 1.2: p = 0.005 (still significant)
+- At Γ = 1.5: p = 0.03 (still significant)
+- At Γ = 2.0: p = 0.12 (no longer significant)
+
+Design sensitivity Γ* ≈ 1.5. The conclusion holds as long as no unmeasured factor doubled (or more) the odds of enrollment within matched pairs.
+
+The substantive question: Could motivation, social connections, or other unmeasured factors double enrollment odds among otherwise-similar people? If that seems plausible, be cautious. If not, the result is credible.
+
+---
+
+# 11. Sensitivity Intervals
+
+## Plain English
+
+Just like sensitivity analysis extends hypothesis testing, it also extends confidence intervals. For each value of Γ, you get a different confidence interval for the treatment effect. As Γ increases (more hidden bias allowed), the interval widens and may eventually include zero.
+
+## The Setup
+
+Assume a constant additive treatment effect:
+$$Y_{ij}(1) = Y_{ij}(0) + \tau$$
+
+For each candidate value $\tau_0$, adjust the pair differences:
+$$D_i(\tau_0) = D_i - \tau_0$$
+
+Test the sharp null $H_0: \tau = \tau_0$ using the worst-case p-value under the Γ-model. The **sensitivity interval** at level $(1-\alpha)$ for a given Γ is:
+$$C_\Gamma(1-\alpha) = \{\tau_0 : p_\Gamma(\tau_0) > \alpha\}$$
+
+At Γ=1 you get the usual randomization confidence interval. As Γ grows, the interval widens to reflect additional uncertainty from possible hidden bias.
+
+```{r sensitivity-intervals, fig.height=4.5}
+set.seed(479)
+I <- 80
+D <- rnorm(I, mean = 1.0, sd = 1.2)
+R <- rank(abs(D))
+S <- as.integer(D > 0)
+
+# For a given tau0 and Gamma, compute worst-case p-value (Wilcoxon)
+worst_case_p <- function(tau0, gamma) {
+  D_adj <- D - tau0
+  S_adj <- as.integer(D_adj > 0)
+  R_adj <- rank(abs(D_adj))
+  W_obs_adj <- sum(R_adj * S_adj)
+  # worst-case: p_s = Gamma/(1+Gamma) maximizes E[W], making W_obs look less extreme
+  p_s   <- gamma / (1 + gamma)
+  E_W   <- p_s * sum(R_adj)
+  Var_W <- gamma / (1 + gamma)^2 * sum(R_adj^2)
+  Z     <- (W_obs_adj - E_W) / sqrt(Var_W)
+  1 - pnorm(Z)
+}
+
+tau_grid <- seq(-0.5, 2.5, by = 0.02)
+gammas_ci <- c(1, 1.5, 2, 3)
+colors_ci  <- c("steelblue", "seagreen", "goldenrod", "tomato")
+
+plot(NULL, xlim = range(tau_grid), ylim = c(0, 1),
+     xlab = expression("Candidate effect " * tau[0]),
+     ylab = expression("Worst-case p-value " * p[Gamma](tau[0])),
+     main = "Sensitivity Intervals: CI widens as Gamma grows")
+abline(h = 0.05, lty = 2, col = "gray50")
+
+for (k in seq_along(gammas_ci)) {
+  pvals <- sapply(tau_grid, worst_case_p, gamma = gammas_ci[k])
+  lines(tau_grid, pvals, col = colors_ci[k], lwd = 2)
+  ci_idx <- which(pvals > 0.05)
+  if (length(ci_idx) > 0) {
+    ci_lo <- tau_grid[min(ci_idx)]
+    ci_hi <- tau_grid[max(ci_idx)]
+    text(mean(c(ci_lo, ci_hi)), 0.07 + k*0.04,
+         paste0("Gamma=", gammas_ci[k], ": [", round(ci_lo,2), ", ", round(ci_hi,2), "]"),
+         cex = 0.75, col = colors_ci[k])
+  }
+}
+legend("topright",
+       legend = paste0("Gamma = ", gammas_ci),
+       col    = colors_ci,
+       lwd    = 2)
+```
+
+**What you see:** At Γ=1 you get the narrowest interval. As Γ increases, the interval widens to reflect growing uncertainty due to possible hidden bias. At large enough Γ, the interval includes zero -- meaning hidden bias at that level could explain a zero treatment effect.
+
+---
+
+# 12. Amplification: Multiple Unmeasured Covariates
+
+## Plain English
+
+The Γ-model is stated in terms of one sensitivity parameter, but that doesn't mean it assumes there is only one unmeasured variable. Many combinations of unmeasured covariates can produce the same Γ.
+
+If you have two unmeasured covariates, each multiplying the treatment odds by $\Gamma_1$ and $\Gamma_2$ respectively, the combined effect could be up to $\Gamma_1 \times \Gamma_2$. So a Γ of 2 could reflect:
+
+- One variable that doubles treatment odds
+- Two variables that each multiply treatment odds by $\sqrt{2} \approx 1.41$
+- Many variables each with small effects
+
+Amplification lets you tell richer, more nuanced stories about what unmeasured confounding is actually doing. It also reminds you that sensitivity analysis is about the **total strength** of hidden bias, not just one hidden variable.
+
+---
+
+# 13. Design Sensitivity and Study Design
+
+## Plain English
+
+**Design sensitivity** is the largest Γ* that a study will achieve (in large samples) under a true treatment effect. It measures how **robust** a study's conclusions are to hidden bias, if the effect is real.
+
+Better study design = higher design sensitivity = more robustness to unmeasured confounding.
+
+What increases design sensitivity?
+- Matching on strong predictors of both treatment and outcome (reduces residual imbalance in U)
+- Using fine balance on important covariates
+- Good overlap between treated and control groups
+- Using more powerful test statistics (e.g., Wilcoxon beats sign test)
+
+What reduces design sensitivity?
+- Poor overlap
+- Weak covariates
+- Highly variable outcomes
+- Using less efficient test statistics
+
+**Key insight:** Sensitivity analysis connects to study design. When designing a study, you should think not just about covariate balance but about how robust the conclusions will be to unmeasured confounding.
+
+---
+
+# 14. What Sensitivity Analysis Does and Does NOT Do
+
+| Does | Does Not |
+|------|----------|
+| Quantify the minimum strength of hidden bias needed to overturn conclusions | Prove there is no unmeasured confounding |
+| Force you to articulate what kind of confounder could explain results away | Tell you whether such a confounder actually exists |
+| Connect study design to robustness | Produce a single pass/fail validity judgment |
+| Let readers assess whether required bias is plausible | Replace the need for good design |
+| Make assumptions transparent | Eliminate uncertainty |
+
+---
+
+# 15. Quick Reference: Key Concepts and Formulas
+
+```{r quick-reference-formulas, echo=FALSE}
+concepts <- data.frame(
+  Concept = c(
+    "Omitted Variable Bias",
+    "Negative Control Outcome",
+    "Negative Control Exposure",
+    "Gamma (Γ) model",
+    "Gamma = 1",
+    "Worst-case Pr(S_i=1) -- one-sided, large T rejects",
+    "Lower bound Pr(S_i=1) -- other tail (small T rejects)",
+    "Sign test T",
+    "Wilcoxon W",
+    "Worst-case p-value (sign)",
+    "Design sensitivity Γ*",
+    "Sensitivity interval"
+  ),
+  Plain_English = c(
+    "Bias from missing U = (effect of U on Y) x (corr of U with Z|X)",
+    "Outcome that treatment cannot possibly affect",
+    "Exposure that cannot possibly affect outcome",
+    "Odds ratio of treatment within a pair is bounded by Γ",
+    "Random assignment within pairs (no hidden bias)",
+    "Use this when large T is evidence: pushes T* up so T_obs looks ordinary",
+    "Use this when small T is evidence: pushes T* down so T_obs looks ordinary",
+    "# pairs where treated unit had higher outcome",
+    "Signed rank: pairs with bigger differences get more weight",
+    "Pr(T* >= T_obs) where T* ~ Binom(I, 1/(1+Γ))",
+    "Γ where worst-case p-value crosses 0.05",
+    "Set of tau_0 values not rejected at level alpha under Γ"
+  ),
+  Formula = c(
+    "bias = gamma * Cov(Z,U|X) / Var(Z|X)",
+    "Y^NC(1) = Y^NC(0) for all units",
+    "Y(a, a^NC) = Y(a, a'^NC) for all a^NC",
+    "1/Γ ≤ [π_i1/(1-π_i1)] / [π_i2/(1-π_i2)] ≤ Γ",
+    "π_i1 = π_i2 = 1/2",
+    "Γ/(1+Γ)",
+    "1/(1+Γ)",
+    "T = sum S_i, S_i = 1{D_i > 0}",
+    "W = sum R_i * S_i",
+    "Pr(T* >= T_obs) where T* ~ Binom(I, Γ/(1+Γ))",
+    "smallest Γ where p_Γ > 0.05",
+    "C_Γ(1-alpha) = {tau_0 : p_Γ(tau_0) > alpha}"
+  )
+)
+
+knitr::kable(concepts, caption = "Quick Reference: Weeks 9-10 Concepts and Formulas")
+```
+
+---
+
+# 16. Full Worked Example: Putting It All Together
+
+Suppose you have a matched-pairs study of a blood pressure medication.
+
+- 200 matched pairs, matched on age/sex/BMI/smoking status
+- Sign test statistic: T = 130 (130 of 200 pairs had better BP in treated group)
+- Wilcoxon W also computed
+
+**Step 1 -- Test under no hidden bias (Γ=1):**
+
+Under H0 and Γ=1: T ~ Binom(200, 0.5). Expected value = 100.
+
+```{r worked-example, fig.height=4.5}
+I       <- 200
+T_obs   <- 130
+
+# p-value at Gamma = 1
+p_at_1 <- 1 - pbinom(T_obs - 1, I, 0.5)
+cat("P-value at Gamma=1:", round(p_at_1, 5), "\n")
+
+# Sensitivity analysis: how does p-value change with Gamma?
+gammas_ex <- seq(1, 4, by = 0.05)
+p_vals_ex <- sapply(gammas_ex, function(g) {
+  # worst-case: Pr(S_i=1) = Gamma/(1+Gamma) makes T stochastically LARGE,
+  # so Pr(T* >= T_obs) is largest (hardest to reject null)
+  p_null <- g / (1 + g)
+  1 - pbinom(T_obs - 1, I, p_null)
+})
+
+# Design sensitivity
+gamma_star_ex <- gammas_ex[which(p_vals_ex > 0.05)[1]]
+cat("Design sensitivity Gamma* =", gamma_star_ex, "\n")
+
+par(mar = c(5, 5, 3, 2))
+plot(gammas_ex, p_vals_ex, type = "l", lwd = 2.5, col = "steelblue",
+     xlab = expression("Gamma"),
+     ylab = expression("Worst-case p-value"),
+     main = paste0("Sensitivity Curve (I=", I, " pairs, T_obs=", T_obs, ")"))
+abline(h = 0.05, lty = 2, col = "firebrick")
+abline(v = gamma_star_ex, lty = 3, col = "steelblue")
+text(gamma_star_ex + 0.1, 0.1,
+     paste0("Gamma* = ", gamma_star_ex),
+     col = "steelblue", adj = 0)
+```
+
+**Step 2 -- Interpret:**
+
+Gamma* ≈ `r gamma_star_ex`. An unmeasured confounder would need to create treatment odds ratios of at least this much within matched pairs to explain away the observed effect.
+
+For a blood pressure study matched on age/sex/BMI/smoking, ask: "Could some unmeasured factor (stress levels? diet quality? genetic predisposition?) create odds ratios of `r gamma_star_ex` between otherwise similar people?" If yes, be cautious. If no, the result is robust.
+
+---
+
+# 17. The Sharp Null in the Context of Sensitivity Analysis
+
+This is worth calling out explicitly because the sharp null has appeared on previous quizzes and it is central to how sensitivity analysis works.
+
+## What is the sharp null?
+
+A null hypothesis is **sharp** if it specifies the value of **every individual potential outcome** -- not just an average.
+
+The canonical example is Fisher's sharp null:
+$$H_0: Y_{ij}(1) = Y_{ij}(0) \quad \text{for all } i, j$$
+
+"Treatment has exactly zero effect on every single unit in the study."
+
+This is called **sharp** because it completely pins down the full science table. Under this null, if you observe $Y_{ij}^{obs}$, you know the missing potential outcome too: $Y_{ij}(1-Z_{ij}) = Y_{ij}^{obs}$. Nothing is unknown.
+
+## Why sensitivity analysis needs the sharp null
+
+In sensitivity analysis, we need to derive the distribution of a test statistic (like the sign test T or Wilcoxon W) under the null. The only way to do this without additional assumptions is under the **sharp null**, because:
+
+- Under the sharp null, the pair differences $D_i$ are fixed numbers (not random). The outcomes are fixed; only the treatment assignment is random.
+- Once $D_i$ is fixed, $S_i = \mathbf{1}\{D_i > 0\}$ is also fixed, and we can work out the distribution of T = $\sum S_i$ exactly.
+- If we only assumed a weak null ($H_0: \tau = 0$ on average), we wouldn't know individual $D_i$ values and couldn't derive the test statistic's distribution.
+
+**In one sentence:** Sensitivity analysis tests the sharp null of no individual treatment effect, using the fact that the sharp null fixes all potential outcomes so only treatment assignment is random.
+
+## Sharp vs. Weak null -- know the difference
+
+| | Sharp Null | Weak Null |
+|--|--|--|
+| **States** | $Y_i(1) = Y_i(0)$ for every unit | $E[Y(1) - Y(0)] = 0$ on average |
+| **Pins down missing outcomes?** | Yes -- all imputable | No -- individuals unknown |
+| **Allows randomization test?** | Yes | No |
+| **Falsified by** | Any single unit with nonzero effect | Average nonzero effects |
+| **Used in** | Fisher's test, Rosenbaum sensitivity analysis | Neymanian testing (t-tests) |
+
+---
+
+# 18. "Explain Why" Practice -- Exam-Style Reasoning Chains
+
+The professor's quiz questions ask you to **explain**, not just state. Here are the key reasoning chains you need to be able to produce.
+
+## "Why does the worst-case p-value use $\Pr(S_i = 1) = \Gamma/(1+\Gamma)$?"
+
+Full chain:
+
+1. We are doing a one-sided test where **large T is evidence against the null** (treated units tend to have better outcomes than controls).
+2. The p-value is $\Pr(T^* \geq T_{obs})$ under the null distribution.
+3. We want the **worst case** = the assignment mechanism that makes this p-value as **large** as possible (most favorable to the null = hardest for us to reject it).
+4. $\Pr(T^* \geq T_{obs})$ is largest when $T^*$ is stochastically **as large as possible** -- because a large $T^*$ means $T_{obs}$ is unsurprising (not in the tail), so we can't reject.
+5. $T^* = \sum S_i^*$ is stochastically largest when each $\Pr(S_i^* = 1)$ is as large as possible.
+6. Under the $\Gamma$-model, the largest allowed value of $\Pr(S_i = 1)$ is $\frac{\Gamma}{1+\Gamma}$.
+7. Therefore the worst-case p-value uses $\Pr(S_i = 1) = \frac{\Gamma}{1+\Gamma}$ for all pairs.
+
+**In one sentence:** To compute the worst-case p-value, we assume the unmeasured confounder is working as hard as possible to push positive signs in the same direction as the observed effect -- making T look unsurprising under the null.
+
+## "Why does sensitivity analysis use matched pairs?"
+
+Matching makes the analysis clean because:
+- Within a pair, both units have similar observed covariates $X_{i1} \approx X_{i2}$.
+- Any remaining difference in treatment probability within the pair must come from **unobserved** covariates.
+- The $\Gamma$-model can then attribute exactly that residual imbalance to hidden bias.
+- If you hadn't matched, treated and control units might differ in observed X too, and you'd need to separate the observed imbalance from the unobserved -- much messier.
+
+Matching isolates the problem of hidden bias from the problem of observed imbalance.
+
+## "What does it mean for a study to be sensitive vs. insensitive to hidden bias?"
+
+- **Insensitive (robust):** Γ* is large. You need a big unmeasured confounder to overturn the conclusion. "Even if treated units were 3x as likely to be selected (in odds) due to something unmeasured, the effect would still be statistically significant."
+- **Sensitive (fragile):** Γ* is small (e.g., 1.1 or 1.2). A tiny amount of hidden bias could explain the result. "If treated and control units differed by just 20% in their odds of selection due to something unmeasured, the result goes away."
+
+The key judgment: Is a Γ of that size **plausible** in this substantive context? That requires domain knowledge, not statistics.
+
+## "What would you look for to know if negative controls are working as intended?"
+
+For a **negative control outcome** to be useful:
+1. You need to be confident the treatment truly cannot affect it (requires subject matter knowledge, not data).
+2. You then check: is there an association between treatment and this outcome after adjusting for observed X?
+3. If yes -- confounding is present. If no -- reassuring but not conclusive (absence of evidence is not evidence of absence; the negative control might just be a weak detector of U).
+
+For a **negative control exposure** to be useful:
+1. The exposure must be something that cannot plausibly affect the outcome (e.g., future exposure, a prior-period variable).
+2. You check whether it predicts the outcome anyway.
+3. If it does -- there are time-varying confounders or selection effects at work.
+
+---
+
+# 19. Common Exam Traps and Clarifications
+
+**Trap 1: "Γ = 2 means the unmeasured variable causes 2x the outcome"**
+Wrong. Γ is about treatment **assignment** (odds of getting treated), not about the effect on the outcome. Γ bounds the odds ratio of treatment within matched pairs due to unmeasured factors. It says nothing directly about how much U affects Y.
+
+**Trap 2: "Sensitivity analysis tells us if confounding is present"**
+No. Sensitivity analysis tells you how strong confounding would need to be to matter. Negative controls are the diagnostic tool for detecting whether confounding is actually present.
+
+**Trap 3: "A study with Gamma* = 5 has no unmeasured confounding"**
+No. It means even if confounding were strong enough to create 5x odds ratios within pairs, your conclusion would still hold. You are not proving the absence of confounding; you are proving the conclusion is robust to confounding up to that strength.
+
+**Trap 4: "The worst-case p-value uses Pr(S_i=1) = 1/(1+Γ)"**
+For a one-sided test where **large T rejects**, the worst-case (hardest to reject) uses $\Gamma/(1+\Gamma)$ -- making T stochastically large so T_obs looks unsurprising. The lower bound $1/(1+\Gamma)$ would be the worst case for the **other tail** (small T as evidence). Get this direction straight: you use whichever probability pushes the null distribution toward T_obs.
+
+**Trap 5: "Negative controls fix unmeasured confounding"**
+No. Negative controls are a diagnostic only. They reveal whether confounding is likely present and in what direction, but they do not remove or adjust for it.
+
+**Trap 6: "The sharp null is the same as 'no average effect'"**
+No. The sharp null says every single individual has zero effect ($Y_i(1) = Y_i(0)$ for all i). A weak null only says the average is zero. You can have a weak null be true with half the people benefiting and half being harmed. The sharp null rules that out.
+
+**Trap 7: "Sensitivity analysis only applies to matched pair designs"**
+No. The lecture notes extend it to matched sets of any size ($m_i \geq 2$ units per set). The paired case is the simplest to understand, but the framework generalizes.
+
+---
+
+# 20. Summary: The Week 9-10 Story in One Place
+
+1. **We always assumed ignorability** -- that conditioning on observed X was enough. That's often unrealistic.
+
+2. **Unmeasured confounding (hidden bias)** can bias estimates. The bias formula: bias = (effect of U on Y) x (correlation of U with Z, given X). Both components need to be nonzero for bias to exist.
+
+3. **Multiple control groups** probe hidden bias by checking whether two comparisons give the same estimate. Agreement is reassuring; disagreement signals trouble.
+
+4. **Negative controls** (outcomes or exposures that can't be causally affected) are placebo tests. Associations with a negative control signal confounding, since they can't be causal.
+
+5. **Sensitivity analysis** formalizes the question "how robust are we?" The Γ-model bounds how different treatment odds can be within matched pairs. Γ=1 is random assignment; Γ>1 allows hidden bias.
+
+6. **Worst-case p-values** under the Γ-model: for each Γ, find the treatment assignment mechanism consistent with Γ that is most favorable to the null. Compute the resulting p-value.
+
+7. **The sensitivity curve** plots worst-case p-value vs Γ. Design sensitivity Γ* is where the curve crosses 0.05. Larger Γ* = more robust conclusion.
+
+8. **Sensitivity intervals** extend this to confidence intervals. The interval widens as Γ grows.
+
+9. **Amplification** reminds us that a given Γ can reflect many unmeasured variables with smaller individual effects.
+
+10. **Design matters**: better design (matching on strong predictors, good overlap) leads to higher design sensitivity.

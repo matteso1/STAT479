@@ -1,0 +1,292 @@
+---
+output:
+  pdf_document:
+    latex_engine: pdflatex
+    keep_tex: false
+geometry: margin=0.25in
+header-includes:
+  - \usepackage{multicol}
+  - \usepackage{enumitem}
+  - \setlist{nosep, leftmargin=1em}
+  - \usepackage{titlesec}
+  - \titleformat{\section}{\normalfont\bfseries\normalsize}{\thesection}{0.3em}{}[\vspace{-2pt}\rule{\columnwidth}{0.4pt}]
+  - \titlespacing*{\section}{0pt}{5pt}{2pt}
+  - \setlength{\parskip}{1.5pt}
+  - \setlength{\parindent}{0pt}
+  - \setlength{\columnsep}{10pt}
+  - \setlength{\columnseprule}{0.2pt}
+  - \pagestyle{empty}
+  - \usepackage{amsmath}
+  - \usepackage{amssymb}
+  - \renewcommand{\baselinestretch}{0.92}
+  - \AtBeginDocument{\footnotesize}
+---
+
+\begin{multicols}{2}
+
+\section*{POTENTIAL OUTCOMES FRAMEWORK}
+
+$Y_i(1)$ = outcome if treated, $Y_i(0)$ = outcome if control. These are \textbf{fixed numbers}, not random variables. Only one is ever observed per person.
+
+$\tau_i = Y_i(1) - Y_i(0)$ \quad (individual treatment effect -- NEVER observable)
+
+$Y_i^{\text{obs}} = Z_i Y_i(1) + (1-Z_i)Y_i(0)$ \quad (switching equation)
+
+$$\tau = \frac{1}{N}\sum_{i=1}^N [Y_i(1) - Y_i(0)] \quad \textbf{(ATE -- a fixed number)}$$
+
+$\hat\tau = \bar Y_T - \bar Y_C$ \quad (difference-in-means estimator)
+
+Under CRD: $\mathbb{E}[\hat\tau] = \tau$ \quad (unbiased -- follows from randomization alone)
+
+\textbf{Why unbiased:} each person is equally likely to be in the treated group, so $\bar Y_T$ is unbiased for $\frac{1}{N}\sum Y_i(1)$ and $\bar Y_C$ for $\frac{1}{N}\sum Y_i(0)$. Subtract $\Rightarrow$ done. No modeling needed.
+
+\textbf{ATT} $= \mathbb{E}[Y(1)\!-\!Y(0)\mid Z\!=\!1]$ \qquad \textbf{ATC} $= \mathbb{E}[Y(1)\!-\!Y(0)\mid Z\!=\!0]$
+
+In an RCT: ATE = ATT = ATC (groups are comparable by design).
+
+\textbf{The big idea:} potential outcomes = fixed (science). $Z$ = random (assignment). ALL probability comes from randomization only. This is ``design-based'' inference -- no model for outcomes needed.
+
+\section*{NEYMAN VARIANCE}
+
+$S_z^2 = \frac{1}{N-1}\sum(Y_i(z)-\bar Y(z))^2$ for $z \in \{0,1\}$
+
+$S_\tau^2 = \frac{1}{N-1}\sum(\tau_i - \tau)^2$ \quad (how much the effect varies across people)
+
+$$\textbf{Exact: } \text{Var}(\hat\tau) = \frac{S_1^2}{n_1} + \frac{S_0^2}{n_0} - \frac{S_\tau^2}{N}$$
+
+\textbf{Reading it:} more spread in POs ($S_1^2, S_0^2$) = noisier. Bigger groups = less noise. Surprisingly, more heterogeneity ($S_\tau^2$) = LESS variance (high-$\tau$ people in treated push $\bar Y_T$ up and their absence pushes $\bar Y_C$ down -- the difference doesn't move as much).
+
+$S_{10} = \frac{1}{N-1}\sum(Y_i(1)\!-\!\bar Y(1))(Y_i(0)\!-\!\bar Y(0))$ -- requires both POs $\Rightarrow$ \textbf{unidentifiable}. This is the fundamental unidentifiable quantity: do people who do well treated also do well untreated?
+
+\textbf{Identity:} $S_\tau^2 = S_1^2 + S_0^2 - 2S_{10}$
+
+$$\textbf{Conservative: } \widehat{\text{Var}}(\hat\tau) = \frac{s_1^2}{n_1} + \frac{s_0^2}{n_0}$$
+
+Drops $-S_\tau^2/N$. Since $S_\tau^2 \ge 0$: estimate too big $\Rightarrow$ CIs too wide $\Rightarrow$ coverage $\ge 95\%$. \textbf{Always valid, never too narrow.}
+
+\textbf{Exact when:} constant effects ($\tau_i = \tau\ \forall i$, so $S_\tau^2 = 0$).
+Proof: $Y_i(1) = Y_i(0)+\tau \Rightarrow S_1^2 = S_0^2$, $S_{10} = S_0^2 \Rightarrow S_\tau^2 = 0$.
+
+\section*{95\% CONFIDENCE INTERVAL}
+
+$$\hat\tau \pm 1.96\sqrt{s_1^2/n_1 + s_0^2/n_0}$$
+
+\textbf{The 4-step logic chain:} (1) unbiasedness centers $\hat\tau$ at $\tau$, (2) FP-CLT $\Rightarrow$ approx Normal (from randomization, NOT assuming outcomes are normal), (3) $\pm 1.96$ SD covers 95\% of Normal, (4) SE is conservative (dropped $S_\tau^2/N \ge 0$) so coverage $\ge 95\%$. Works for ANY population, ANY outcome distribution.
+
+\section*{FP-CLT vs i.i.d. CLT}
+
+\begin{tabular}{@{}l|l@{}}
+\textbf{FP-CLT (this class)} & \textbf{i.i.d. CLT (intro stats)} \\
+\hline
+Only $Z_i$ is random & Everything is random \\
+Outcomes are FIXED numbers & Outcomes = random draws \\
+Finite population of $N$ & Infinite superpopulation \\
+Variance from assignment & Variance from sampling \\
+No normality assumption & Needs normality or large $n$ \\
+Does NOT pool variances & Often pools variances \\
+\end{tabular}
+
+\textit{Neyman's approach uses the top column. Classical t-test uses the bottom. Similar answers when $n_1 \approx n_0$ and variances similar, but justification is totally different.}
+
+\section*{FISHER vs NEYMAN}
+
+\begin{tabular}{@{}l|l@{}}
+\textbf{Fisher} & \textbf{Neyman} \\
+\hline
+Test if $\tau = 0$ (p-value) & Estimate $\tau$ (point est + CI) \\
+Sharp null (specifies all $\tau_i$) & No assumption on $\tau_i$ \\
+Exact (enumerate assignments) & Asymptotic (CLT-based) \\
+Struggles w/ heterogeneity & Targets average naturally \\
+\end{tabular}
+
+Complementary: Fisher = ``is there any effect?'' Neyman = ``how big, and how uncertain?''
+
+\section*{FWL THEOREM}
+
+$\tilde Z_i = Z_i - \hat{\mathbb{E}}[Z\mid X_i]$ \quad (residualize $Z$ on $X$)
+
+$$\hat\tau_{\text{FWL}} = \frac{\sum \tilde Z_i Y_i}{\sum \tilde Z_i^2} = \text{coeff on } Z \text{ in } Y \sim Z + X$$
+
+Weights: $w_i = \tilde Z_i / \sum \tilde Z_j^2$
+
+\textbf{Balancing:} $\sum w_i X_i = 0$ (regression \textit{creates} balance on $X$), \quad $\sum_{Z_i=1} w_i = 1$
+
+\textbf{Misspecification bias:} $\text{Bias} = \sum w_i\, g(X_i)$
+
+\textit{Intuition:} regression balances $X$ linearly. But if the true model has $X^2$, $\log X$, or unobserved confounders, $\sum w_i g(X_i) \ne 0$ and you get bias. Example: $\bar X_T = \bar X_C$ but treated have high $X^2$ $\Rightarrow$ biased.
+
+\textbf{Extrapolation:} groups in different $X$ regions $\Rightarrow$ regression guesses across the gap. No data in between means pure model-dependent fiction.
+
+\textbf{When mispec doesn't matter:} if $\mathbb{E}[Z\mid X] = \mathbb{E}[Z]$ (e.g., RCT), then $\tilde Z \perp g(X) \Rightarrow$ bias $= 0$.
+
+\textbf{Regression in experiments:} unbiased even if model wrong (randomization $\Rightarrow \tilde Z \perp g(X)$). Reduces variance like noise-cancelling headphones. Does NOT change estimand. Refines a good design, doesn't rescue a bad one.
+
+\section*{FISHER'S FRAMEWORK}
+
+\textbf{Sharp null:} $H_0: Y_i(1) = Y_i(0)$ for ALL $i$. This \textit{fills in every missing outcome}: under $H_0$, $Y_i(1) = Y_i(0) = Y_i^{\text{obs}}$ for everyone. That is what makes the test possible.
+
+\textbf{Weak null:} $H_0: \tau = 0$. Can't fill in individual POs $\Rightarrow$ can't run randomization test.
+
+\textbf{Sharp false + weak true:} possible! E.g., $\tau_i = +1,+1,-1,-1$. Average $= 0$ (weak true) but every individual has $Y_i(1) \ne Y_i(0)$ (sharp false).
+
+\textbf{The randomization test (know these steps cold):}
+(1) State $H_0$: sharp null. (2) Under $H_0$, all POs known $= Y^{\text{obs}}$. (3) Choose test stat $T$ (e.g., diff-in-means). (4) Compute $T_{\text{obs}}$. (5) Enumerate all $\binom{N}{n_1}$ assignments, compute $T$ for each. (6) p-value = fraction with $|T| \ge |T_{\text{obs}}|$.
+
+\textbf{Min p-value} $= 1/\binom{N}{n_1}$. Ex: $N\!=\!6, n_1\!=\!3 \Rightarrow 1/20 = 0.05$. With tiny $N$, some significance levels are literally impossible.
+
+Exact, no distributional assumptions. Doubling one-sided $p$ NOT always valid (randomization distribution can be asymmetric).
+
+\textbf{Test stats:} diff-in-means (powerful, outlier-sensitive) vs Wilcoxon/ranks (robust). Different stats can give different p-values under the same sharp null because they weight the data differently.
+
+Randomization test $\ne$ permutation test: same calculation, different justification (design-based vs model-based).
+
+\textbf{CI by inversion:} adjust $Y^{\text{adj}} = Y^{\text{obs}} - Z\tau_0$, test each $\tau_0$: $\mathcal{C} = \{\tau_0 : p(\tau_0) > \alpha\}$. \textit{Idea:} if true $\tau = \tau_0$, subtracting it out should leave no treatment effect. Keep all values you can't reject. Exact, any sample size, no normality.
+
+\section*{RANDOMIZATION DESIGNS}
+
+\textbf{CRD:} $\Pr(\mathbf Z = \mathbf z) = 1/\binom{N}{n_1}$. Each: $\Pr(Z_i\!=\!1) = n_1/N$. Assignments NOT independent (fixing $n_1$ creates dependence).
+
+\textbf{Blocked:} randomize within strata. $\hat\tau_{BL} = \sum_k \frac{n_k}{N}(\bar Y_{T,k} - \bar Y_{C,k})$. Removes between-block variation $\Rightarrow$ lower variance. $K\!=\!1$ block = CRD.
+
+\textbf{Paired:} strongest blocking. Match pairs, flip coin within each.
+
+\textbf{Bernoulli:} $Z_i \sim \text{Bern}(p)$ iid. Group sizes random. Can get very imbalanced.
+
+\textbf{Cluster:} randomize whole clusters. Effective $N$ = \# clusters, not individuals.
+
+\textbf{Deterministic assignment bias:} $Z_i = \mathbf{1}\{X_i > c\}$
+$$\mathbb{E}[\bar Y_T - \bar Y_C] = \tau + \beta(\mathbb{E}[X\mid X\!>\!c] - \mathbb{E}[X\mid X\!\le\!c])$$
+Biased by construction. This is exactly what randomization prevents.
+
+\section*{THREE ASSUMPTIONS (OBS STUDIES)}
+
+\textbf{1. SUTVA:} (a) no interference -- my outcome depends only on MY treatment (b) no hidden versions of treatment. \textit{When violated:} vaccines (herd immunity), social networks, classrooms.
+
+\textbf{2. Ignorability:} $(Y(1),Y(0)) \perp\!\!\!\perp Z \mid X$ -- conditional on $X$, treatment is as-good-as-random. \textbf{Untestable from data!} Must argue from subject-matter knowledge. This is the assumption you can never verify.
+
+\textbf{3. Overlap:} $0 < \Pr(Z\!=\!1\mid X\!=\!x) < 1\ \forall x$. \textit{If all young men are treated and none are control, you have no comparison for young men.}
+
+Strong ignorability = \#2 + \#3 together.
+
+\section*{SELECTION BIAS DECOMPOSITION}
+
+$$\mathbb{E}[Y\mid Z\!=\!1] - \mathbb{E}[Y\mid Z\!=\!0] = \underbrace{\text{ATT}}_{\text{causal}} + \underbrace{\mathbb{E}[Y(0)\mid Z\!=\!1] - \mathbb{E}[Y(0)\mid Z\!=\!0]}_{\text{selection bias}}$$
+
+\textbf{Derive it:} SUTVA $\Rightarrow$ LHS $= \mathbb{E}[Y(1)\mid Z\!=\!1] - \mathbb{E}[Y(0)\mid Z\!=\!0]$. Add/subtract $\mathbb{E}[Y(0)\mid Z\!=\!1]$ and regroup. Selection bias = ``would treated have had different outcomes even WITHOUT treatment?'' \textit{If exercisers are healthier at baseline, their $Y(0)$ is already higher $\Rightarrow$ naive estimate inflated.}
+
+\section*{IDENTIFICATION PROOF (know this chain!)}
+
+$\mathbb{E}[Y(1)] = \mathbb{E}[\mathbb{E}[Y(1)\mid X]]$ \hfill (tower property)
+
+$= \mathbb{E}[\mathbb{E}[Y(1)\mid Z\!=\!1,X]]$ \hfill (ignorability lets us add $Z\!=\!1$)
+
+$= \mathbb{E}[\mathbb{E}[Y\mid Z\!=\!1,X]]$ \hfill (consistency + overlap)
+
+Same for $Y(0)$. Subtract:
+$\boxed{\tau = \mathbb{E}[\mathbb{E}[Y\mid Z\!=\!1,X] - \mathbb{E}[Y\mid Z\!=\!0,X]]}$
+
+\textit{This is the key result: it turns unobservable causal quantities into observable conditional means.}
+
+ATT: average inner part over $X\mid Z\!=\!1$. ATC: over $X\mid Z\!=\!0$. Works with $e(X)$ replacing $X$.
+
+\section*{PROPENSITY SCORE}
+
+$e(X) = \Pr(Z\!=\!1\mid X)$ \quad (estimated via logistic regression)
+
+\textbf{Balancing property:} $(Y(1),Y(0)) \perp\!\!\!\perp Z \mid e(X)$. \textit{Collapse all covariates into one number and match on that instead.}
+
+\textbf{Proof:} Fix $e(X)\!=\!p$. Everyone has $\Pr(Z\!=\!1) = p$, so treated are a random subset within this stratum. The $p$'s cancel: $\Pr(X\!=\!x\mid Z\!=\!1,e\!=\!p) = \Pr(X\!=\!x\mid e\!=\!p)$.
+
+PS coefficients = what predicts SELECTION into treatment, NOT causal effects. \textit{A positive coeff on ``married'' means married people are more likely to get treated, not that marriage causes the outcome.} Goal = balance, not prediction. Don't include instruments (affect $Z$ not $Y$ -- adds variance, no bias reduction).
+
+\section*{BALANCE DIAGNOSTICS}
+
+$$\text{SMD} = \frac{\bar X_T - \bar X_C}{\sqrt{(s_T^2 + s_C^2)/2}}$$
+
+$< 0.1$ good, $\approx 0.2$ marginal, $> 0.25$ bad. Variance ratio $= s_T^2/s_C^2$, want $\approx 1$.
+
+Use SMD not t-tests: t-tests are sample-size dependent (huge $N$ makes trivial differences ``significant''; small $N$ misses big ones). SMD measures actual substantive imbalance. Love plot: SMDs before vs after for each covariate -- you want all dots moving toward zero.
+
+\section*{DESIGN vs ANALYSIS (sacred boundary)}
+
+\textbf{Design (no $Y$):} estimate PS, match/weight, check balance (SMDs, Love plot), overlap (PS histograms). Iterate. \textbf{Analysis (use $Y$):} estimate $\hat\tau$, CI. \textit{Never peek at outcomes during design.} This prevents fishing/p-hacking. Like pre-registration. Peeking at $Y$ to choose matches = selection bias.
+
+\section*{MATCHING}
+
+A design tool (NO outcomes). Creates balanced dataset $\Rightarrow$ simple analysis.
+
+$$\hat\tau = \frac{1}{n_M}\sum_{Z_i=1}[Y_i - Y_{j(i)}] \quad j(i) = \text{matched control}$$
+
+\textit{Intuition:} if matched pair has similar $X$, background effects $g(X)$ cancel when you subtract, leaving mostly treatment effect.
+
+Bias bound: $|\text{Bias}| \le L(|\Delta_X^M| + 2s_D)$. $L$ = steepness of $g$ (nature, can't control). $\Delta_X^M$ = avg match gap, $s_D$ = inconsistency of gaps (both under your control via better matching). \textit{This is why we obsess over SMDs -- they directly check the conditions that keep bias small.}
+
+\textbf{Mahalanobis:} $d_M = \sqrt{(X_i\!-\!X_j)^\top\hat\Sigma^{-1}(X_i\!-\!X_j)}$ -- rescales by spread + correlation. A 1-year age gap and a \$1 income gap are very different; Mahalanobis puts them on a fair scale. Breaks in high dimensions (``nearest'' neighbor is still far) $\Rightarrow$ add PS caliper.
+
+\textbf{Composite:} $d = (X_i\!-\!X_j)^2 + \lambda\cdot\mathbf{1}\{W_i \ne W_j\}$. Large $\lambda$ = soft exact match on category. \textbf{Optimal:} minimizes TOTAL distance across all pairs (greedy NN doesn't).
+
+\textbf{1:k:} more controls = lower variance, worse match quality. Tradeoff.
+
+\textbf{Exact match} on categories can hurt continuous balance (forces bad matches just to stay within-group). \textbf{Near-fine balance:} softer -- similar marginal distributions, allows cross-category matches. Better overall balance.
+
+\section*{SUBCLASSIFICATION}
+
+$\hat\tau_{\text{strat}} = \sum_k \frac{N_k}{N}(\bar Y_{T,k} - \bar Y_{C,k})$. 5 PS strata $\approx$ 90\% bias removed. Sparse strata ($n_1 = 1$) = high variance $\Rightarrow$ merge. If PS model wrong, stratification can make things WORSE.
+
+\section*{IPW (INVERSE PROBABILITY WEIGHTING)}
+
+$$\hat\tau_{\text{IPW}} = \frac{1}{N}\sum\left[\frac{Z_i Y_i}{\hat e(X_i)} - \frac{(1-Z_i)Y_i}{1-\hat e(X_i)}\right]$$
+
+\textit{Idea:} a treated person with $e = 0.1$ ``represents'' many untreated people like them, so upweight. A treated person with $e = 0.9$ is typical of the treated population, low weight. Reweighting creates a pseudo-population where treatment is independent of $X$.
+
+\textbf{Why unbiased:} $\mathbb{E}[ZY/e(X)] = \mathbb{E}[Y(1)]$. Tower + ignorability: $e(X)$ cancels perfectly.
+
+\textbf{Balances ANY $g(X)$:} $\mathbb{E}[Zg(X)/e(X)] = \mathbb{E}[g(X)]$. Works for $X, X^2, \sin(X)$. \textit{Unlike regression, IPW balances nonlinear functions too.} If empirical balance fails $\Rightarrow$ PS model is wrong.
+
+$\mathbb{E}[w_i] = 2$: tower gives $\mathbb{E}[Z/e\mid X] = 1$, $\mathbb{E}[(1\!-\!Z)/(1\!-\!e)\mid X] = 1$. Sum $= 2$.
+
+\textbf{ESS} $\approx (\sum w_i)^2/\sum w_i^2$. Equal weights: $N$. Extreme: collapses. Ex: $N\!=\!200$, half $e\!=\!0.5$ (wt 2), half $e\!=\!0.01$ (wt 100) $\Rightarrow$ ESS $\approx 15$. \textit{A few people dominate the whole estimate.}
+
+\textbf{Fixes:} (1) \textbf{Trim} to $[0.1,0.9]$ -- changes estimand. (2) \textbf{Stabilized:} $w^s = Z\hat p/\hat e + (1\!-\!Z)(1\!-\!\hat p)/(1\!-\!\hat e)$. (3) \textbf{Hajek:} normalize weights per group. Tiny bias, much lower variance.
+
+\textit{Matching can be stable when IPW is not:} if most units have $e \approx 0.5$ (good matches) but a few have $e \approx 0.01$ (extreme weights), matching ignores the extreme units while IPW is destroyed by them.
+
+\section*{AIPW (DOUBLY ROBUST)}
+
+$$\hat\tau = \frac{1}{N}\sum\!\left[\hat\mu_1(X_i) - \hat\mu_0(X_i) + \frac{Z_i(Y_i - \hat\mu_1)}{\hat e} - \frac{(1\!-\!Z_i)(Y_i - \hat\mu_0)}{1-\hat e}\right]$$
+
+\textbf{4 terms:} $\hat\mu_1 - \hat\mu_0$ = regression guess. Remaining terms = IPW-weighted residuals (correction). If outcome model perfect $\Rightarrow$ residuals $= 0$, just regression. If PS model perfect $\Rightarrow$ correction rescues bad regression. \textbf{Doubly robust:} works if EITHER correct. Fails only if BOTH wrong. Best efficiency when both correct. Can still perform poorly in finite samples with extreme weights or bad fits.
+
+\textbf{Reg-based ATE:} fit $\hat\mu_1$ on treated, $\hat\mu_0$ on controls, predict for everyone: $\hat\tau = \frac{1}{N}\sum[\hat\mu_1(X_i) - \hat\mu_0(X_i)]$.
+
+\section*{OVERLAP / ALL METHODS}
+
+PS near 0 or 1 $\Rightarrow$ ALL methods fail (not just IPW). Trim to $[0.1,0.9]$ -- changes estimand to overlap subpop. Check PS histograms: if treated and control barely touch, honest answer is ``ATE cannot be reliably estimated.''
+
+ALL methods (matching, strat, IPW, AIPW, regression) need SUTVA + ignorability + overlap. \textbf{Unobserved confounding $\Rightarrow$ ALL wrong.} No amount of clever modeling fixes what you didn't measure. AIPW preferred: two chances to get it right.
+
+\section*{R CODE / METHOD SUMMARY}
+
+\textbf{PS:} logistic reg of $Z$ on covariates. Coefficients = selection, NOT causal.
+
+\textbf{Distance:} Mahalanobis + PS with weights $c(w_1, w_2)$. Higher PS weight $\Rightarrow$ closer PS matches (useful when covariates are high-dimensional and PS captures main confounding).
+
+\textbf{Matching:} $\text{design}=c(1,k)$ for 1:k. \emph{exactmatchon} = hard. \emph{finebalanceVars} = soft.
+
+\textbf{Reg ATE:} $\hat\tau = \frac{1}{N}\sum[\hat\mu_1(X_i) - \hat\mu_0(X_i)]$
+
+\textbf{IPW:} $\frac{1}{N}\sum\frac{ZY}{e} - \frac{(1-Z)Y}{1-e}$
+
+\textbf{AIPW:} $\frac{1}{N}\sum[\hat\mu_1\!-\!\hat\mu_0 + \frac{Z(Y-\hat\mu_1)}{e} - \frac{(1-Z)(Y-\hat\mu_0)}{1-e}]$
+
+\smallskip
+\begin{tabular}{@{}l|l|l@{}}
+\textbf{Method} & \textbf{Pro} & \textbf{Con} \\
+\hline
+Match & Transparent & Drops unmatched \\
+Strat & Simple, 90\% bias & Stratum noise \\
+IPW & All data, bal any $g$ & Extreme wts \\
+AIPW & Doubly robust & Both wrong=fail \\
+\end{tabular}
+
+\end{multicols}

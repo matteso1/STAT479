@@ -1,156 +1,439 @@
-# STAT 479 MIDTERM CHEAT SHEET (1 page, front & back)
-
-## ====== SIDE 1: FORMULAS + FRAMEWORK ======
-
-### POTENTIAL OUTCOMES & ESTIMANDS
-- $Y_i(1)$ = outcome if treated, $Y_i(0)$ = outcome if not. Fixed numbers, NOT random.
-- $\tau_i = Y_i(1) - Y_i(0)$ (individual effect). NEVER observable (fundamental problem).
-- $Y_i^{obs} = Z_i Y_i(1) + (1-Z_i)Y_i(0)$ (you see one, never both)
-- $\tau = \frac{1}{N}\sum[Y_i(1) - Y_i(0)]$ (ATE -- finite population, fixed number)
-- $\hat{\tau} = \bar{Y}_T - \bar{Y}_C$ (difference in means estimator)
-- Under CRD: $\mathbb{E}[\hat{\tau}] = \tau$ (unbiased, from randomization alone)
-- **ATT** $= \mathbb{E}[Y(1)-Y(0)|Z\!=\!1]$ | **ATC** $= \mathbb{E}[Y(1)-Y(0)|Z\!=\!0]$ | In RCT: ATE=ATT=ATC
-
-### NEYMAN VARIANCE (CRITICAL)
-- $S_z^2 = \frac{1}{N-1}\sum(Y_i(z) - \bar{Y}(z))^2$ for $z=0,1$ (spread of potential outcomes over ALL N people)
-- $S_\tau^2 = \frac{1}{N-1}\sum(\tau_i - \tau)^2$ (treatment effect heterogeneity)
-- **Exact variance:** $\text{Var}(\hat{\tau}) = \frac{S_1^2}{n_1} + \frac{S_0^2}{n_0} - \frac{S_\tau^2}{N}$
-- **KEY IDENTITY:** $S_\tau^2 = S_1^2 + S_0^2 - 2S_{10}$
-  - $S_{10}$ = cov between $Y_i(1)$ and $Y_i(0)$ -- UNIDENTIFIABLE (need both for same person, never have it)
-  - So $S_\tau^2$ is also unidentifiable --> can't compute exact variance
-- **Conservative estimator:** $\widehat{Var}(\hat{\tau}) = \frac{s_1^2}{n_1} + \frac{s_0^2}{n_0}$ where $s_z^2$ = sample variance in observed group $z$
-  - Overestimates because drops $-S_\tau^2/N$ (and $S_\tau^2 \ge 0$ always -- sum of squares)
-- **Exact when:** $\tau_i = \tau$ for all $i$ (constant effect). Then $S_\tau^2 = 0$.
-  - Under constant effects: $S_1^2 = S_0^2$ and $S_{10} = S_1^2$, so $S_\tau^2 = S_1^2 + S_1^2 - 2S_1^2 = 0$
-
-### ALTERNATE VARIANCE FORM
-$$\text{Var}(\hat{\tau}) = \frac{n_0}{n_1 N}S_1^2 + \frac{n_1}{n_0 N}S_0^2 + \frac{2}{N}S_{10}$$
-Same formula, rearranged. Shows $S_{10}$ directly. Both forms equivalent via algebra.
-
-### 95% CI (WHY IT WORKS)
-$$\hat{\tau} \pm 1.96\sqrt{s_1^2/n_1 + s_0^2/n_0}$$
-1. Unbiasedness centers $\hat{\tau}$ around $\tau$
-2. Finite-pop CLT: distribution across randomizations is approx Normal (from randomization, NOT normality of outcomes)
-3. $\pm 1.96$ SD covers 95% of Normal
-4. Our SE is too big (dropped $S_\tau^2/N \ge 0$) so interval is wider --> coverage $\ge$ 95%
-
-### FWL THEOREM (WEEK 1)
-- $\tilde{Z}_i = Z_i - \hat{E}[Z|X_i]$ (residual from regressing $Z$ on $X$)
-- $\hat{\tau} = \frac{\sum \tilde{Z}_i Y_i}{\sum \tilde{Z}_i^2}$ -- same as regression coefficient on $Z$
-- Weights: $w_i = \tilde{Z}_i / \sum \tilde{Z}_j^2$
-- **Balances:** $\sum w_i X_i = 0$ (weighted covariate means equal)
-- **Misspecification bias:** $\text{Bias} = \sum w_i g(X_i)$ where $g(X)$ = omitted nonlinear part
-  - Balances $X$ but NOT $X^2$, $\log(X)$, interactions, unobserved vars
-- **Extrapolation:** If treated/control occupy different $X$ regions, $\tilde{Z}_i$ is large at extremes --> extreme weights --> extrapolation into no-data regions
-
-### FISHER'S FRAMEWORK
-- **Sharp null:** $H_0: Y_i(1) = Y_i(0)$ for ALL $i$ -- specifies every missing outcome. Required for Fisher's test.
-- **Weak null:** $H_0: \tau = 0$ -- average is zero but individuals may differ. Cannot use randomization test.
-- Under $H_0$: all potential outcomes known ($= Y_i^{obs}$)
-- p-value = fraction of $\binom{N}{n_1}$ randomizations with $|T| \ge |T_{obs}|$
-- **Exact** (no asymptotics), valid from randomization alone
-- One-sided p = count/total. Doubling for two-sided NOT always valid (distribution may not be symmetric)
-- **CI by inversion:** Adjust $Y_i^{adj} = Y_i^{obs} - Z_i \cdot \tau_0$. Test each $\tau_0$. Keep non-rejected values: $C = \{\tau_0 : p(\tau_0) > \alpha\}$
-- **Diff-in-means** vs **Wilcoxon**: same procedure, different test statistic. Wilcoxon uses ranks --> robust to outliers. Can give different p-values under same null.
-
-### RANDOMIZATION vs. REGRESSION
-| Randomization | Regression |
-|---|---|
-| Balances EVERYTHING (incl. unobserved) | Only balances what you include (linearly) |
-| No model needed | Needs correct functional form |
-| Design-based inference | Model-based inference |
-
-### REGRESSION INSIDE EXPERIMENTS
-- Still unbiased even if model is wrong (because randomization)
-- **Why:** $Z$ is mean-independent of $X$ under randomization, so $\tilde{Z}_i \perp g(X_i)$ --> bias $= \sum w_i g(X_i) = 0$ even if $g$ is wrong
-- Reduces variance (noise-canceling) -- does NOT change estimand
-- Refines a good design, doesn't rescue a bad one
+# STAT 479 CHEAT SHEET -- HANDWRITING VERSION
+# Print this or copy it by hand. Organized into clear blocks.
 
 ---
 
-## ====== SIDE 2: OBS STUDIES + METHODS ======
+## PAGE 1 FRONT -- POTENTIAL OUTCOMES + VARIANCE
 
-### THREE ASSUMPTIONS FOR OBS STUDIES
-1. **SUTVA:** (a) No interference (my outcome doesn't depend on your treatment) (b) No hidden versions of treatment
-2. **Ignorability:** $(Y(1),Y(0)) \perp\!\!\!\perp Z \mid X$ -- all confounders measured. UNTESTABLE.
-3. **Overlap:** $0 < Pr(Z=1|X=x) < 1$ for all $x$ -- everyone has a chance of being in either group
+---
 
-### IDENTIFICATION (KNOW THIS PROOF)
-$\mathbb{E}[Y(1)] = \mathbb{E}[\mathbb{E}[Y(1)|X]]$ (tower property)
-$= \mathbb{E}[\mathbb{E}[Y(1)|Z\!=\!1,X]]$ (ignorability)
-$= \mathbb{E}[\mathbb{E}[Y|Z\!=\!1,X]]$ (consistency + overlap)
-Same for $Y(0)$. Subtract: $\tau = \mathbb{E}[\mathbb{E}[Y|Z\!=\!1,X] - \mathbb{E}[Y|Z\!=\!0,X]]$
+POTENTIAL OUTCOMES
 
-### SELECTION BIAS DECOMPOSITION
-$$\mathbb{E}[Y|Z\!=\!1] - \mathbb{E}[Y|Z\!=\!0] = \underbrace{ATT}_{\text{causal}} + \underbrace{\mathbb{E}[Y(0)|Z\!=\!1] - \mathbb{E}[Y(0)|Z\!=\!0]}_{\text{selection bias}}$$
-Derivation: SUTVA converts $Y$ to $Y(Z)$. Add/subtract $\mathbb{E}[Y(0)|Z\!=\!1]$. Vanishes under randomization or ignorability.
+    Y_i(1) = outcome if treated       (FIXED number, not random)
+    Y_i(0) = outcome if not treated    (FIXED number, not random)
+    tau_i  = Y_i(1) - Y_i(0)          (individual effect -- NEVER observable)
 
-### PROPENSITY SCORE $e(X) = Pr(Z=1|X)$
-- **Balancing property:** $(Y(1),Y(0)) \perp\!\!\!\perp Z \mid e(X)$ -- match on 1 number instead of all $X$
-- Coarsest balancing score. **Proof:** $\Pr(X=x|Z\!=\!1,e(X)\!=\!p) = \frac{p \cdot \Pr(X=x)}{p} = \Pr(X=x|e(X)\!=\!p)$
-- Estimated via logistic regression; coefficients describe SELECTION, not causal effects
-- Goal = balance, NOT prediction accuracy
-- Don't include instruments (affect $Z$ but not $Y$) -- increases variance without reducing bias
+    Y_obs  = Z * Y(1) + (1-Z) * Y(0)  (you only see one)
 
-### SMD (STANDARDIZED MEAN DIFFERENCE)
-$$SMD = \frac{\bar{X}_T - \bar{X}_C}{\sqrt{(s_T^2 + s_C^2)/2}}$$
-$< 0.1$ = good | $\approx 0.2$ = marginal | $> 0.25$ = bad. Use SMD not t-tests (t-test is sample-size dependent).
+    ATE    = (1/N) * SUM[ Y_i(1) - Y_i(0) ]    (average over everyone)
+    ATT    = E[ Y(1)-Y(0) | Z=1 ]              (effect on the treated)
+    ATC    = E[ Y(1)-Y(0) | Z=0 ]              (effect on the untreated)
+    In a randomized experiment: ATE = ATT = ATC
 
-### BLOCKED DESIGN
-- Blocked estimator: $\hat{\tau}_{BL} = \sum_k (n_k/N)(\bar{Y}_{T,k} - \bar{Y}_{C,k})$. Reduces variance by removing between-block variation.
-- Matched-pair estimator: $\hat{\tau}_{match} = \frac{1}{n_M}\sum_{i:Z_i=1}[Y_i - Y_{j(i)}]$
+    Estimator:  tau_hat = Y_bar_T - Y_bar_C     (unbiased under CRD)
 
-### MATCHING
-- **Design tool** (no outcomes!) -- creates balanced dataset, then simple analysis
-- Types: exact, nearest-neighbor, Mahalanobis, PS, optimal
-- **Bias bound:** $|Bias| \le L(|\Delta_X^M| + 2s_D)$ where $L$ = Lipschitz (max steepness of $g$)
-- **Mahalanobis:** $d_M = \sqrt{(X_i-X_j)^T \hat{\Sigma}^{-1} (X_i-X_j)}$ -- normalizes scale + correlation
-  - Breaks in high dimensions (curse of dimensionality) --> add PS caliper
-- **Exact matching** on categorical var can worsen balance on others (forces within-category matches when categories are sparse). **Near-fine balance** relaxes this: enforces marginal distribution balance while allowing cross-category matches.
-- **Distance weights** c(w1,w2): higher w2 on PS = closer PS matches but maybe worse raw covariate matches. Trade-off.
-- **1:1 vs 1:k**: 1:k uses $k$ controls per treated --> lower variance (more data), but match quality degrades (further matches). `design = c(1,k)` in R.
+---
 
-### SUBCLASSIFICATION (STRATIFICATION)
-$$\hat{\tau}_{strat} = \sum_{k=1}^{K} \frac{N_k}{N}(\bar{Y}_{T,k} - \bar{Y}_{C,k})$$
-- 5 strata removes ~90% of bias (Cochran). More strata = less bias but noisier.
-- If one stratum has very few treated (e.g., $n_1=1$): high variance. Merge with neighbor.
+NEYMAN VARIANCE
 
-### IPW (INVERSE PROBABILITY WEIGHTING)
-$$\hat{\tau}_{IPW} = \frac{1}{N}\sum\left[\frac{Z_i Y_i}{\hat{e}(X_i)} - \frac{(1-Z_i)Y_i}{1-\hat{e}(X_i)}\right]$$
-- **Why unbiased:** $\mathbb{E}\left[\frac{Z_i Y_i}{e(X_i)}\right] = \mathbb{E}[Y_i(1)]$ (tower prop + ignorability: $e(X)$ cancels)
-- **Balancing property (PROOF):** $\mathbb{E}\left[\frac{Z}{e(X)}g(X)\right] = \mathbb{E}\left[\frac{E[Z|X]}{e(X)}g(X)\right] = \mathbb{E}[g(X)]$
-  - IPW MUST balance all $g(X)$ if PS correct. If balance is bad --> PS model is wrong.
-- **Extreme weights problem:** $e(X) \approx 0$ or $1$ --> weights blow up --> one person dominates --> high variance, instability. This = overlap violation.
-- **Stabilized weights:** $w_i^{stab} = Z_i \cdot \hat{p}/\hat{e}(X_i) + (1-Z_i)(1-\hat{p})/(1-\hat{e}(X_i))$ where $\hat{p} = n_1/N$. Multiplies by marginal prob of actual treatment received.
-- **Hajek estimator:** Uses stabilized weights in a ratio form: $\frac{\sum w_i^T Y_i}{\sum w_i^T} - \frac{\sum w_i^C Y_i}{\sum w_i^C}$. Slightly biased but much lower variance.
-- Matching stable when PS near 0.5 for most; IPW unstable when any PS extreme.
+    S1^2 = (1/(N-1)) SUM( Y_i(1) - Ybar(1) )^2     (spread of treated outcomes, ALL N)
+    S0^2 = (1/(N-1)) SUM( Y_i(0) - Ybar(0) )^2     (spread of control outcomes, ALL N)
+    S_tau^2 = (1/(N-1)) SUM( tau_i - tau )^2         (how much effects vary across people)
 
-### AIPW (DOUBLY ROBUST)
-$$\hat{\tau}_{AIPW} = \frac{1}{N}\sum\left[\hat{\mu}_1(X_i) - \hat{\mu}_0(X_i) + \frac{Z_i(Y_i - \hat{\mu}_1(X_i))}{\hat{e}(X_i)} - \frac{(1-Z_i)(Y_i - \hat{\mu}_0(X_i))}{1-\hat{e}(X_i)}\right]$$
-**4 terms:** (1) predicted outcome under trt (2) minus predicted under ctrl = regression estimate. (3) IPW correction for treated residuals (4) IPW correction for control residuals.
-- If outcome model perfect: residuals = 0, correction vanishes, just get regression estimate
-- If PS model perfect: IPW correction fixes bad regression
-- **Doubly robust:** consistent if EITHER model correct. Fails if BOTH wrong.
-- Best efficiency when both correct (achieves semiparametric bound)
-- Can still fail in finite samples: extreme weights, poor outcome fit, limited overlap
+    EXACT VARIANCE:
+    +-------------------------------------------------+
+    | Var(tau_hat) = S1^2/n1 + S0^2/n0 - S_tau^2/N   |
+    +-------------------------------------------------+
 
-### DESIGN VS. ANALYSIS (KEY PRINCIPLE)
-- **Design phase (NO outcomes):** estimate PS, match/weight, check balance (SMDs, Love plots, overlap). Iterate until balance good.
-- **Analysis phase (NOW use Y):** estimate $\hat{\tau}$, build CI.
-- Never peek at $Y$ during design -- prevents fishing/specification searching.
-- Like pre-registering a clinical trial.
+    ALTERNATE FORM:
+    Var(tau_hat) = (n0/n1*N)*S1^2 + (n1/n0*N)*S0^2 + (2/N)*S10
 
-### OVERLAP / TRIMMING
-- If PS near 0 or 1 somewhere: no good comparisons there. ALL methods fail (not just IPW).
-- **Trim** to e.g. $[0.1, 0.9]$ -- changes estimand to overlap subpopulation ATE.
-- Check with PS histograms for treated vs control.
+    KEY IDENTITY:  S_tau^2 = S1^2 + S0^2 - 2*S10
+        S10 = cov(Y_i(1), Y_i(0)) -- need both for same person --> UNIDENTIFIABLE
+        So S_tau^2 is also unidentifiable --> can't compute exact variance
 
-### R CODE PATTERNS (EXAM)
-- `glm(Z ~ age + edu, family=binomial)` = logistic regression for PS. Coefficients = what predicts SELECTION into treatment (not causal)
-- `multigrp_dist_struc(df,"Z",list(mahal=c("age"),ps="ps"),c(1,2))` = distance combining Mahalanobis (wt 1) + PS (wt 2)
-- `kwaymatching(dist,"Z",indexgroup="treated",design=c(1,2))` = 1:2 matching (each treated gets 2 controls)
-- `tau_ipw = mean(Z*Y/ps - (1-Z)*Y/(1-ps))` = Horvitz-Thompson IPW
-- `tau_aipw = mean(mu1-mu0 + Z*(Y-mu1)/ps - (1-Z)*(Y-mu0)/(1-ps))` = AIPW
+    CONSERVATIVE ESTIMATOR (what we actually use):
+    +---------------------------------------------+
+    | Var_hat = s1^2/n1 + s0^2/n0                 |
+    +---------------------------------------------+
+    s1^2, s0^2 = sample variances from OBSERVED groups
+    Overestimates because it drops -S_tau^2/N (which is <= 0)
+    So CIs are wider than needed --> coverage >= 95%
 
-### WHEN ALL METHODS FAIL
-Regression, matching, stratification, IPW, AIPW ALL require assumptions (mainly ignorability). If there is strong **unobserved confounding** (something affects both $Z$ and $Y$ that you didn't measure), all methods give wrong answers. Example: unmeasured disease severity drives both treatment choice and outcome.
+    EXACT WHEN: constant effects (tau_i = tau for all i, so S_tau^2 = 0)
+        Why: constant shift --> S1^2 = S0^2, S10 = S1^2
+        --> S_tau^2 = S1^2 + S1^2 - 2*S1^2 = 0
+
+---
+
+95% CONFIDENCE INTERVAL
+
+    +---------------------------------------------+
+    | tau_hat +/- 1.96 * sqrt(s1^2/n1 + s0^2/n0) |
+    +---------------------------------------------+
+
+    WHY THIS WORKS (4 steps):
+    1. Unbiasedness centers tau_hat at tau
+    2. FP-CLT: distribution is approx Normal (from RANDOMIZATION, not outcome normality)
+    3. +/- 1.96 SD covers 95% of a Normal
+    4. Our SE is too big (dropped S_tau^2/N >= 0) --> coverage >= 95%
+
+---
+
+FP-CLT vs i.i.d. CLT
+
+    FP-CLT (this class)              |  i.i.d. CLT (intro stats)
+    -------------------------------- | --------------------------------
+    Only Z_i is random               |  Everything random (Y, X, Z)
+    Potential outcomes are FIXED      |  Outcomes are random draws
+    Finite population of N people     |  Infinite superpopulation
+    Variance from assignment          |  Variance from sampling
+    No distributional assumptions     |  Needs probability model
+
+---
+
+## PAGE 1 BACK -- FWL + FISHER + EXPERIMENTS
+
+---
+
+FWL THEOREM (how regression adjusts for covariates)
+
+    Step 1: Regress Z on X. Get residuals Z_tilde = Z - E_hat[Z|X]
+    Step 2: tau_hat = SUM(Z_tilde * Y) / SUM(Z_tilde^2)
+            This equals the coefficient on Z in the full regression Y ~ Z + X
+
+    Weights: w_i = Z_tilde_i / SUM(Z_tilde_j^2)
+
+    BALANCING: SUM(w_i * X_i) = 0   (weighted covariate means are equal)
+    Weights sum to 1 in each group:  SUM(w_i, Z=1) = 1
+
+    MISSPECIFICATION BIAS:
+    +---------------------------------------------+
+    | Bias = SUM( w_i * g(X_i) )                  |
+    +---------------------------------------------+
+    g(X) = the nonlinear part you left out (X^2, log(X), etc.)
+    Balances X but NOT X^2, log(X), interactions, unobserved vars
+
+    EXTRAPOLATION: groups in different X regions --> regression guesses in the gap
+
+    WHEN MISSPECIFICATION DOESN'T MATTER:
+    If E[Z|X] = E[Z]  (treatment independent of X, e.g., randomized experiment)
+    then Z_tilde ~ Z - Zbar, uncorrelated with any g(X) --> bias = 0
+
+---
+
+FISHER'S FRAMEWORK
+
+    SHARP NULL: H0: Y_i(1) = Y_i(0) for ALL i
+        --> specifies every missing outcome (all = Y_obs)
+        --> required for Fisher's test
+
+    WEAK NULL: H0: tau = 0 (average is zero, individuals may differ)
+        --> CANNOT run randomization test (don't know individual outcomes)
+
+    PROCEDURE:
+    1. Compute T_obs (e.g., diff in means)
+    2. Under H0, enumerate all C(N, n1) possible assignments
+    3. For each, compute T (outcomes don't change under sharp null)
+    4. p-value = fraction with |T| >= |T_obs|
+
+    Min possible p-value = 1 / C(N, n1)
+        Ex: N=6, n1=3 --> min p = 1/20 = 0.05
+
+    EXACT, no distributional assumptions needed
+    Doubling one-sided p for two-sided is NOT always valid (distribution may be asymmetric)
+
+    TEST STATISTICS: diff-in-means (sensitive to outliers)
+                     Wilcoxon/ranks (robust to outliers)
+
+    RANDOMIZATION TEST =/= PERMUTATION TEST
+        Same calculation, different reasoning
+        Randomization: valid because YOU randomized
+        Permutation: assumes exchangeability (model assumption)
+
+    Type I error = reject true H0 (prob alpha)
+    Type II error = fail to reject false H0
+    Power = 1 - Type II error rate
+
+---
+
+TESTING tau = tau_0 AND CI BY INVERSION
+
+    1. Adjust: Y_adj = Y_obs - Z * tau_0
+    2. Run Fisher test on adjusted data
+    3. CI = all tau_0 values that are NOT rejected:
+       C = { tau_0 : p(tau_0) > alpha }
+    Exact, works in any sample size, no normality needed
+
+---
+
+RANDOMIZATION DESIGNS
+
+    CRD:  Fix n1 treated out of N. Pr(Z=z) = 1/C(N,n1)
+          Each person: Pr(Z_i=1) = n1/N
+          Assignments NOT independent (filling fixed slots)
+
+    BLOCKED:  Randomize within blocks (e.g., age groups)
+              Pr(Z) = PRODUCT[ 1/C(n_k, m_k) ]
+              tau_hat = SUM[ (n_k/N) * (Ybar_T,k - Ybar_C,k) ]
+              Reduces variance. K=1 block = CRD.
+
+    PAIRED:   Strongest blocking. Match pairs, randomize within.
+              Test stat: T = SUM_b (Y_bT - Y_bC)
+
+    BERNOULLI: Each Z_i ~ Bernoulli(p) independently
+               n1 is RANDOM (Binomial). Simple but can get imbalanced.
+
+    CLUSTER:  Randomize whole clusters (schools, hospitals)
+              Effective N = number of clusters, NOT individuals
+
+---
+
+DETERMINISTIC ASSIGNMENT BIAS
+
+    Z_i = 1{X_i > c}   and   Y_i(0) = alpha + beta*X_i + eps
+
+    +-------------------------------------------------------------------+
+    | E[Ybar_T - Ybar_C] = tau + beta*(E[X|X>c] - E[X|X<=c])  =/= tau  |
+    +-------------------------------------------------------------------+
+    Biased because treated group has systematically higher X
+
+---
+
+## PAGE 2 FRONT -- OBS STUDIES + ASSUMPTIONS + PROPENSITY SCORE
+
+---
+
+THREE ASSUMPTIONS
+
+    1. SUTVA
+       (a) No interference -- my outcome depends only on MY treatment
+       (b) No hidden versions of treatment (one well-defined treatment)
+
+    2. IGNORABILITY (untestable!)
+       (Y(1), Y(0))  indep  Z | X
+       "Among people with same X, who gets treated is as-good-as-random"
+
+    3. OVERLAP (positivity)
+       0 < Pr(Z=1|X=x) < 1  for all x
+       "Every type of person could end up in either group"
+
+    Strong ignorability = #2 + #3 together
+
+---
+
+SELECTION BIAS DECOMPOSITION (know the derivation)
+
+    +-----------------------------------------------------------------------+
+    | E[Y|Z=1] - E[Y|Z=0] = ATT + { E[Y(0)|Z=1] - E[Y(0)|Z=0] }         |
+    |                        ^^^     ^^^^^^^^^^^^^^^^^^^^^^^^^^             |
+    |                       causal          selection bias                  |
+    +-----------------------------------------------------------------------+
+
+    Derivation:
+    Start: E[Y|Z=1] - E[Y|Z=0]
+    SUTVA: = E[Y(1)|Z=1] - E[Y(0)|Z=0]
+    Add & subtract E[Y(0)|Z=1]:
+    = { E[Y(1)|Z=1] - E[Y(0)|Z=1] } + { E[Y(0)|Z=1] - E[Y(0)|Z=0] }
+    =           ATT                  +       selection bias
+    Vanishes under randomization or ignorability.
+
+---
+
+IDENTIFICATION PROOF (know this chain!)
+
+    Want: E[Y(1)]
+    Step 1: = E[ E[Y(1) | X] ]                    (tower property)
+    Step 2: = E[ E[Y(1) | Z=1, X] ]               (ignorability: can add Z=1)
+    Step 3: = E[ E[Y | Z=1, X] ]                  (consistency: Y = Y(1) for treated)
+
+    Same for Y(0). Subtract:
+    +-------------------------------------------------------------+
+    | tau = E[ E[Y|Z=1,X] - E[Y|Z=0,X] ]                        |
+    +-------------------------------------------------------------+
+
+    ATT version: same inner part, average over X distribution of TREATED
+    ATC version: same inner part, average over X distribution of CONTROLS
+    Also works with e(X) instead of X (balancing property)
+
+---
+
+PROPENSITY SCORE
+
+    e(X) = Pr(Z=1 | X)
+
+    BALANCING PROPERTY: (Y(1),Y(0)) indep Z | e(X)
+        Match on 1 number instead of all covariates
+        Coarsest balancing score
+
+    PROOF SKETCH:
+        Fix e(X) = p. Everyone in group has same Pr(Z=1) = p.
+        Pr(X=x | Z=1, e=p) = p*Pr(X=x) / p = Pr(X=x | e=p)
+        The p's cancel! Treated are a random subset within each PS stratum.
+
+    Estimated via logistic regression
+    Coefficients = what predicts SELECTION, NOT causal effects
+    Goal = balance, NOT prediction accuracy
+    Don't include instruments (affect Z but not Y)
+
+---
+
+BALANCE DIAGNOSTICS
+
+    SMD = (Xbar_T - Xbar_C) / sqrt( (s_T^2 + s_C^2) / 2 )
+
+        < 0.1  = good
+        ~ 0.2  = marginal
+        > 0.25 = bad
+
+    VARIANCE RATIO = Var(X_T) / Var(X_C)    should be near 1
+
+    Use SMD not t-tests (t-test depends on sample size)
+
+    LOVE PLOT: SMDs before vs after matching. Want all dots near 0.
+
+---
+
+DESIGN vs ANALYSIS (sacred boundary)
+
+    DESIGN (no outcomes):  estimate PS, match/weight, check balance, check overlap
+    ANALYSIS (now use Y):  estimate tau, build CI, sensitivity analysis
+
+    Never peek at Y during design. Like pre-registering a clinical trial.
+
+---
+
+## PAGE 2 BACK -- MATCHING + IPW + AIPW + R CODE
+
+---
+
+MATCHING (a design tool -- no outcomes!)
+
+    Estimator: tau_hat = (1/n_M) SUM_{Z=1} [ Y_i - Y_j(i) ]
+               j(i) = matched control for treated person i
+
+    BIAS BOUND:  |Bias| <= L * (|Delta_X| + 2*s_D)
+        L = steepness of outcome function
+        Delta_X = avg match gap
+        s_D = how inconsistent match quality is
+
+    TYPES:
+        Exact: identical covariates (impractical with continuous vars)
+        Nearest-neighbor: closest on distance
+        Mahalanobis: d = sqrt( (Xi-Xj)' * Sigma_inv * (Xi-Xj) )
+            Normalizes scale + correlation. Breaks in high dimensions.
+        PS matching: match on propensity score
+        Optimal: minimizes TOTAL distance across all pairs
+
+    COMPOSITE DISTANCE: d = (Xi-Xj)^2 + lambda * 1{Wi =/= Wj}
+        Large lambda = strong preference for same-category matches
+
+    1:1 vs 1:k: more controls = lower variance, worse match quality
+    Exact matching on categories can hurt other balance.
+    Near-fine balance = softer: similar marginal distributions, allows cross-category.
+
+---
+
+SUBCLASSIFICATION
+
+    tau_hat = SUM_k (N_k/N) * (Ybar_T,k - Ybar_C,k)
+
+    5 strata removes ~90% of bias (Cochran)
+    Watch for sparse strata --> merge with neighbor
+    If PS model wrong, can make things WORSE
+
+---
+
+IPW (INVERSE PROBABILITY WEIGHTING)
+
+    +-----------------------------------------------------------+
+    | tau_IPW = (1/N) SUM[ Z*Y/e(X) - (1-Z)*Y/(1-e(X)) ]      |
+    +-----------------------------------------------------------+
+
+    ATT version:
+    tau_ATT = (1/n1) SUM[ Z*Y - e(X)*(1-Z)*Y / (1-e(X)) ]
+
+    WHY UNBIASED:
+        E[ Z*Y / e(X) ]  =  E[ e(X)*E[Y(1)|X] / e(X) ]  =  E[Y(1)]
+        Tower property + ignorability. The e(X) cancels.
+
+    IPW BALANCES ANY g(X):
+        E[ Z*g(X)/e(X) ] = E[ g(X)/e(X) * E[Z|X] ] = E[ g(X)*e(X)/e(X) ] = E[g(X)]
+        Works for g = X, X^2, sin(X), anything
+        If balance is bad in data --> PS model is wrong
+
+    E[w_i] = 2:
+        w_i = Z/e(X) + (1-Z)/(1-e(X))
+        E[Z/e(X) | X] = e(X)/e(X) = 1
+        E[(1-Z)/(1-e(X)) | X] = (1-e(X))/(1-e(X)) = 1
+        Sum = 2
+
+    ESS = (SUM w_i)^2 / SUM(w_i^2)
+        Equal weights: ESS = N.  Extreme weights: ESS collapses.
+
+    EXTREME WEIGHTS: e(X) near 0 or 1 --> huge weights --> one person dominates
+
+    FIXES:
+        Trimming: drop e(X) outside [0.1, 0.9] (changes estimand)
+        Stabilized: w_stab = Z*p_hat/e(X) + (1-Z)*(1-p_hat)/(1-e(X))
+        Hajek: SUM(Z*Y/e) / SUM(Z/e) - SUM((1-Z)*Y/(1-e)) / SUM((1-Z)/(1-e))
+            Forces weights to sum to 1. Tiny bias, much lower variance.
+
+---
+
+AIPW (DOUBLY ROBUST)
+
+    +-------------------------------------------------------------------------+
+    | tau_AIPW = (1/N) SUM[ mu1(X) - mu0(X)                                  |
+    |                       + Z*(Y-mu1(X))/e(X)                               |
+    |                       - (1-Z)*(Y-mu0(X))/(1-e(X)) ]                     |
+    +-------------------------------------------------------------------------+
+
+    4 TERMS:
+        mu1 - mu0 = regression estimate
+        Z*(Y-mu1)/e = IPW-weighted treated residual (correction)
+        (1-Z)*(Y-mu0)/(1-e) = IPW-weighted control residual (correction)
+
+    HOW IT SELF-CORRECTS:
+        Outcome model perfect --> residuals = 0, corrections vanish, just regression
+        PS model perfect --> IPW corrections fix bad regression
+        DOUBLY ROBUST: works if EITHER model is correct. Fails only if BOTH wrong.
+
+---
+
+REGRESSION-BASED ATE
+
+    Fit mu1(X) on treated only, mu0(X) on controls only
+    Predict for EVERYONE
+    tau_reg = (1/N) SUM[ mu1(Xi) - mu0(Xi) ]
+
+---
+
+R CODE PATTERNS
+
+    PS model:       glm(Z ~ age + edu + married, family=binomial)
+                    Coefficients = SELECTION, not causal
+
+    Distance:       multigrp_dist_struc(df, "Z",
+                      list(mahal=c("age","edu"), ps="ps_logit"), c(1,2))
+                    c(1,2) = PS gets 2x weight of Mahalanobis
+
+    Matching:       kwaymatching(dist, "Z", indexgroup="treated", design=c(1,2))
+                    design=c(1,2) = each treated gets 2 controls
+                    exactmatchon="race"     = hard: only within same race
+                    finebalanceVars="race"  = soft: overall distribution similar
+
+    Reg ATE:        m1 = lm(Y~X, subset=Z==1)
+                    m0 = lm(Y~X, subset=Z==0)
+                    ATE = mean(predict(m1,df) - predict(m0,df))
+
+    IPW:            mean(Z*Y/ps - (1-Z)*Y/(1-ps))
+
+    AIPW:           mean(mu1-mu0 + Z*(Y-mu1)/ps - (1-Z)*(Y-mu0)/(1-ps))
+
+---
+
+ALL METHODS NEED SAME ASSUMPTIONS
+
+    Regression, Matching, Subclassification, IPW, AIPW
+    ALL require: SUTVA + Ignorability + Overlap
+    If unobserved confounding exists, ALL methods give wrong answers.
+    Different tools, same requirements. AIPW preferred (two chances to be right).
+
+---
+
+OVERLAP / TRIMMING
+
+    If PS near 0 or 1 --> no comparisons --> ALL methods fail
+    Trim to [0.1, 0.9] --> changes estimand to overlap subpopulation
+    Check with PS histograms (treated vs control side by side)

@@ -16,13 +16,13 @@ knitr::opts_chunk$set(
   warning = FALSE,
   message = FALSE,
   fig.width = 9,
-  fig.height = 5,
+  fig.height = 5.5,
   comment = "#>"
 )
 set.seed(479)
 ```
 
-**Format:** Free response / short answer on blank paper. One sheet (front+back) cheat sheet allowed. Calculator allowed. ~75 minutes, ~10 questions.
+**Format:** Free response / short answer on blank paper. One sheet (front+back) cheat sheet allowed. Calculator (any) allowed. **65 minutes + 5 minutes reading time. 7 problems, 75 points total. Maximum possible score = 65 (10-point buffer).** Try to answer as many questions as you can.
 
 ---
 
@@ -103,9 +103,7 @@ In a randomized experiment, ATE = ATT = ATC (because treated and control groups 
 
 ### Selection Bias
 
-The problem that arises when the people who get treated are **systematically difGenuinely the best professor I’ve had at Madison. You really understand how to teach, and the structure of this class was perfect. I also want to say how impressed I am with how thoughtfully you integrated AI into the course. In so many other classes, it feels like instructors just ignore the fact that AI can complete a lot of assignments. I’m not saying that’s necessarily good, but I think educators need to start re-evaluating AI’s role in learning—it can be an incredible tool when it’s used to enhance understanding rather than replace thinking. The way you approached it, with the exam format, AI-supported assignments, and handwritten worksheets, struck exactly the right balance.
-
-ferent** from the people who don't, even before treatment. If healthier people are more likely to exercise, then comparing exercisers to non-exercisers overestimates the effect of exercise (because exercisers were healthier to begin with).
+The problem that arises when the people who get treated are **systematically different** from the people who don’t, even before treatment. If healthier people are more likely to exercise, then comparing exercisers to non-exercisers overestimates the effect of exercise (because exercisers were healthier to begin with).
 
 ### Potential Outcomes
 
@@ -202,7 +200,7 @@ $$\hat{\tau} = \frac{\sum_{i=1}^{n} \tilde{Z}_i Y_i}{\sum_{i=1}^{n} \tilde{Z}_i^
 
 ### Visualizing FWL: The Residualization
 
-```{r fwl-visualization, fig.height=4}
+```{r fwl-visualization, fig.height=5}
 # ----- Generate observational data with a confounder -----
 n <- 200
 X <- rnorm(n, 50, 10)                    # covariate (e.g., age)
@@ -222,21 +220,21 @@ full_fit <- lm(Y ~ Z + X)
 tau_full <- coef(full_fit)["Z"]
 
 # ----- Plot -----
-par(mfrow = c(1, 3), mar = c(4, 4, 3, 1))
+par(mfrow = c(1, 3), mar = c(5.5, 4, 3, 1))
 
 # Panel 1: Z vs X -- treatment depends on the covariate
 plot(X, Z, pch = 16, col = adjustcolor("gray30", 0.4), cex = 0.8,
      main = "Step 1: Z depends on X",
      xlab = "Covariate X (e.g., age)", ylab = "Treatment Z")
 lines(sort(X), fitted(Z_on_X)[order(X)], col = "firebrick", lwd = 2)
-mtext("Red line = E[Z | X]", side = 1, line = 2.8, cex = 0.7, col = "firebrick")
+mtext("Red line = E[Z | X]", side = 1, line = 4, cex = 0.7, col = "firebrick")
 
 # Panel 2: Z_tilde -- the residual (part X can't explain)
 plot(X, Z_tilde, pch = 16, col = adjustcolor("steelblue", 0.5), cex = 0.8,
      main = expression("Step 2: Residualize " * tilde(Z) * " = Z - E[Z|X]"),
      xlab = "Covariate X", ylab = expression(tilde(Z)))
 abline(h = 0, lty = 2, col = "gray50")
-mtext("Residual is uncorrelated with X (balanced!)", side = 1, line = 2.8, cex = 0.7)
+mtext("Residual is uncorrelated with X (balanced!)", side = 1, line = 4, cex = 0.7)
 
 # Panel 3: Y vs Z_tilde -- the FWL regression
 plot(Z_tilde, Y, pch = 16, col = adjustcolor("seagreen", 0.5), cex = 0.8,
@@ -245,7 +243,7 @@ plot(Z_tilde, Y, pch = 16, col = adjustcolor("seagreen", 0.5), cex = 0.8,
 abline(fwl_fit, col = "firebrick", lwd = 2)
 mtext(paste0("Slope = ", round(tau_fwl, 3), " (same as full regression: ",
              round(tau_full, 3), ")"),
-      side = 1, line = 2.8, cex = 0.7, col = "firebrick")
+      side = 1, line = 4, cex = 0.7, col = "firebrick")
 ```
 
 **What you see:** Panel 2 is the key -- after residualizing, the "treatment residual" is uncorrelated with X. Regression has stripped out the confounder. The slope in Panel 3 IS the regression coefficient on Z from the full model.
@@ -288,7 +286,7 @@ where $g(X)$ is the nonlinear part you left out.
 
 ### Visualizing Misspecification Bias
 
-```{r misspecification-bias, fig.height=4.5}
+```{r misspecification-bias, fig.height=5}
 # ----- Data where the TRUE relationship is quadratic -----
 n <- 300
 X <- runif(n, 0, 10)
@@ -336,9 +334,9 @@ abline(h = 3, lty = 2, col = "seagreen")
 
 This is a separate failure mode that the practice problems emphasize.
 
-**What it is:** If treated and control groups occupy different regions of the covariate space, regression is forced to **extrapolate** -- it uses the fitted line to predict what would happen in a region where you have no data.
+**What it is:** If the treated people and control people have very different values of $X$ (say treated people are all ages 60-80 and controls are all ages 20-40), then there is a gap in the middle where you have NO data from either group. Regression draws a straight line through that gap and pretends it knows what would happen there. That is **extrapolation** -- making up answers where you have no evidence.
 
-```{r extrapolation, fig.height=5}
+```{r extrapolation, fig.height=5.5}
 # ----- Generate data with poor overlap -----
 n <- 150
 X_t <- rnorm(75, mean = 70, sd = 8)
@@ -382,19 +380,19 @@ legend("topleft",
 
 **What you see:** The yellow zone has no data from either group. Regression draws a straight line through it, but the true relationship is curved (solid lines). The straight-line extrapolation gives wrong answers in the gap. This is why overlap matters -- without it, regression (and any method) is guessing.
 
-**How to detect it:** Look at the distributions of covariates in the treated and control groups. If they barely overlap, regression is extrapolating. Love plots and histograms help.
+**How to detect it:** Make a histogram of $X$ for the treated group and a histogram of $X$ for the control group. If they barely overlap (the two groups live in different ranges of $X$), you are in trouble -- regression is just guessing in the gap. Love plots and side-by-side histograms are your friends here.
 
 ## 3.7 When Regression IS Unbiased Despite Misspecification
 
 There is one important special case where regression works even if the model is wrong.
 
-**If treatment is mean-independent of covariates** -- meaning $\mathbb{E}[Z \mid X] = \mathbb{E}[Z]$ (treatment assignment doesn't depend on $X$) -- then the regression coefficient $\hat{\tau}$ is unbiased for $\tau$ even if the true outcome model is nonlinear.
+**If who gets treated has nothing to do with their background** -- meaning knowing someone's age, income, etc. tells you nothing about whether they got treated ($\mathbb{E}[Z \mid X] = \mathbb{E}[Z]$, i.e., treatment doesn't depend on $X$) -- then the regression coefficient $\hat{\tau}$ gives you the right answer even if the model is totally wrong.
 
-**Why?** By FWL, the residual $\tilde{Z}_i = Z_i - \hat{\mathbb{E}}[Z \mid X_i]$. If $Z$ is independent of $X$, then $\hat{\mathbb{E}}[Z \mid X_i]$ is roughly constant, so $\tilde{Z}_i \approx Z_i - \bar{Z}$. This means $\tilde{Z}_i$ is uncorrelated with any function of $X$, including the omitted nonlinear part $g(X)$. So the bias term $\sum w_i g(X_i) \approx 0$.
+**Why?** Think about the FWL residual $\tilde{Z}_i$. If treatment has nothing to do with $X$, then trying to predict $Z$ from $X$ gives you basically the same prediction for everyone ($\bar{Z}$). So $\tilde{Z}_i \approx Z_i - \bar{Z}$, which is just "were you treated, minus the overall fraction treated." This leftover has nothing to do with $X$, or $X^2$, or any function of $X$. So the bias term $\sum w_i g(X_i) \approx 0$ -- the nonlinear stuff you left out of the model washes out.
 
-**When does this hold?** In a **randomized experiment**. Randomization makes $Z$ independent of $X$, which implies mean-independence. This is exactly why regression adjustment inside an experiment (Section 6) is unbiased even if the linear model is wrong -- the randomization guarantees that $\tilde{Z}$ is orthogonal to everything, including omitted nonlinearities.
+**When does this happen?** In a **randomized experiment**. A coin flip (or random draw) doesn't care about your age or income, so treatment is independent of $X$. This is why running a regression inside an experiment works even if the linear model is wrong -- randomization kills the bias.
 
-**When does it fail?** In an **observational study** where treatment depends on covariates. Then $\tilde{Z}_i$ is correlated with $X$, and any omitted nonlinearity in $g(X)$ creates bias.
+**When does it NOT work?** In an **observational study** where treatment depends on background characteristics. If sicker people are more likely to get the drug, then $\tilde{Z}_i$ is connected to health, and any nonlinear relationship between health and the outcome ($g(X)$) bleeds into your estimate.
 
 ## 3.8 Key Limitations Summary
 
@@ -465,7 +463,7 @@ This is the killer feature. Randomization handles confounders **you don't even k
 
 ### Visualizing: Randomization Balances Everything (Including Unobserved Variables)
 
-```{r randomization-balance, fig.height=5}
+```{r randomization-balance, fig.height=5.5}
 # ----- Population of 500 people with many covariates -----
 N <- 500
 n1 <- 250
@@ -576,6 +574,20 @@ Even when you can randomize, experiments have limitations:
 - **Interference:** One person's treatment affects another's outcome (violates SUTVA)
 - **Ethical/logistical constraints:** Sometimes randomization is simply not possible
 
+## 4.7 What Happens Without Randomization: Deterministic Assignment Bias
+
+**Exam-style example (from review):** Suppose instead of flipping a coin, you treat everyone whose test score is above a cutoff: $Z_i = \mathbf{1}\{X_i > c\}$ ("treat if $X$ is big enough"). And suppose the outcome depends on $X$:
+
+$$Y_i(0) = \alpha + \beta X_i + \varepsilon_i, \quad Y_i(1) = Y_i(0) + \tau$$
+
+**Is the difference-in-means estimator still unbiased?** Nope.
+
+The problem: the treated group is ALL the high-$X$ people and the control group is ALL the low-$X$ people. Since $Y_i(0)$ depends on $X$, the treated people would have had higher outcomes EVEN WITHOUT treatment. So when you compare treated vs. control averages:
+
+$$\mathbb{E}[\bar{Y}_T - \bar{Y}_C] = \tau + \beta\big(\underbrace{\mathbb{E}[X_i \mid X_i > c]}_{\text{high}} - \underbrace{\mathbb{E}[X_i \mid X_i \le c]}_{\text{low}}\big) \ne \tau$$
+
+You get the real treatment effect PLUS a bonus from the fact that treated people had bigger $X$ values to begin with. The DM estimator is **biased upward** (when $\beta > 0$). This is exactly the problem randomization avoids -- a coin flip does not care about your $X$.
+
 ---
 
 # 5. Weeks 3--4: Potential Outcomes -- The Language of Causation
@@ -613,7 +625,7 @@ This is called the **fundamental problem of causal inference**, and it is why th
 
 ### Visualizing the Fundamental Problem
 
-```{r fundamental-problem, fig.height=4.5}
+```{r fundamental-problem, fig.height=5}
 # ----- Build a toy population of 8 people -----
 n_fp <- 8
 people <- data.frame(
@@ -659,13 +671,13 @@ mtext(paste("Estimated ATE =", round(tau_hat_fp, 2)), side = 3, line = 0, cex = 
 
 ## 5.3 The "Science" vs. the "Assignment"
 
-A key concept in this class is the strict separation between:
+There are two separate pieces:
 
-1. **The Science** ($\mathcal{S}$): All the potential outcomes $\{Y_i(1), Y_i(0)\}$ for every person. These are **fixed, unknown numbers**. They are not random.
+1. **The Science** ($\mathcal{S}$): Everyone's potential outcomes $\{Y_i(1), Y_i(0)\}$. These are **fixed numbers** that are set in stone before the experiment starts. Person 5's outcome under treatment is some specific number -- it is not random. Think of them as tattoos on everyone's body that you can only partially read.
 
-2. **The Assignment** ($\mathbf{Z}$): The random process that determines who gets treated. This is the **only thing that is random** in the whole setup.
+2. **The Assignment** ($\mathbf{Z}$): The coin flip (or random draw) that decides who gets treated. **This is the ONLY thing that is random in the entire setup.**
 
-All the probability and statistics in this framework come from the randomization of who gets treated, NOT from any randomness in the outcomes themselves.
+This is a big deal because it means all the probability in this framework -- the variance formulas, the CLT, the confidence intervals -- comes from the randomization, NOT from assuming outcomes follow some distribution.
 
 ## 5.4 The Target: Finite-Population Average Treatment Effect (PATE)
 
@@ -683,6 +695,8 @@ $$\hat{\tau} = \bar{Y}_T - \bar{Y}_C = \frac{1}{n_1}\sum_{i: Z_i=1} Y_i^{\text{o
 
 Jerzy Neyman developed a framework focused on **estimating** the average treatment effect and quantifying uncertainty.
 
+**Before we dive in, one important idea you need:** In this class, probability does NOT come from assuming outcomes follow a bell curve or any distribution. The outcomes are fixed numbers. The ONLY randomness is the treatment assignment -- the coin flip that decides who goes in which group. When we talk about "variance" and "confidence intervals" below, we mean: how much does the estimate bounce around if you re-did the randomization? This is called the **design-based** or **finite-population** approach, and it is different from what you learned in intro stats (where randomness comes from sampling from a big population). We will make this contrast precise later in this section.
+
 ### Unbiasedness
 
 Under a completely randomized design:
@@ -693,7 +707,7 @@ $$\mathbb{E}[\hat{\tau}] = \tau$$
 
 ### Visualizing Unbiasedness: The Estimate Bounces, but Centers on Truth
 
-```{r unbiasedness-simulation, fig.height=4.5}
+```{r unbiasedness-simulation, fig.height=5}
 # ----- Same 8 people, repeat the experiment 5000 times -----
 n_ub <- 8
 Y1_ub <- c(8, 6, 10, 4, 7, 9, 5, 11)
@@ -752,15 +766,15 @@ $$\text{Var}(\hat{\tau}) = \frac{S_1^2}{n_1} + \frac{S_0^2}{n_0} - \frac{S_\tau^
 
 ### The problem with $S_\tau^2$ (and $S_{10}$)
 
-$S_\tau^2$ requires knowing $\tau_i = Y_i(1) - Y_i(0)$ for every person -- which requires seeing **both** potential outcomes. We never have that.
+To compute $S_\tau^2$, you need $\tau_i = Y_i(1) - Y_i(0)$ for every person. But that means seeing both their treated AND untreated outcome -- which is the fundamental problem again. You never have both, so you can never compute $S_\tau^2$ directly.
 
-**There is an algebraic identity:**
+**There is an identity that links these things:**
 
 $$S_\tau^2 = S_1^2 + S_0^2 - 2S_{10}$$
 
-where $S_{10} = \frac{1}{N-1}\sum_{i=1}^{N}\big(Y_i(1) - \bar{Y}(1)\big)\big(Y_i(0) - \bar{Y}(0)\big)$ is the **covariance** between treated and control potential outcomes.
+where $S_{10}$ is the covariance between a person's treated outcome and their control outcome: do people who do well under treatment also do well without it? In math: $S_{10} = \frac{1}{N-1}\sum_{i=1}^{N}\big(Y_i(1) - \bar{Y}(1)\big)\big(Y_i(0) - \bar{Y}(0)\big)$.
 
-**Why $S_{10}$ is unidentifiable:** To compute it you need $Y_i(1)$ AND $Y_i(0)$ for the same person. You only ever see one. So $S_{10}$ is forever unknown, which means $S_\tau^2$ is also forever unknown.
+**Why $S_{10}$ is forever unknowable:** To compute it, you need to see both $Y_i(1)$ and $Y_i(0)$ for the SAME person. You only ever see one. So $S_{10}$ is a number that exists in theory but can never be calculated from data. This means $S_\tau^2$ is also forever unknown.
 
 **Alternate form of Neyman's variance (using $S_{10}$):** Substituting $S_\tau^2 = S_1^2 + S_0^2 - 2S_{10}$:
 
@@ -788,7 +802,7 @@ This **overestimates** the true variance because it pretends $S_\tau^2 = 0$.
 
 ### Visualizing: Exact vs Conservative Variance
 
-```{r neyman-variance, fig.height=4.5}
+```{r neyman-variance, fig.height=5.5}
 # ----- Population with heterogeneous treatment effects -----
 N_nv <- 200
 Y0_nv <- rnorm(N_nv, mean = 50, sd = 10)
@@ -815,7 +829,7 @@ for (s in 1:n_sims_nv) {
   var_ests_nv[s] <- var(Y_obs[Z == 1]) / n1_nv + var(Y_obs[Z == 0]) / n0_nv
 }
 
-par(mar = c(5, 6, 3, 1))
+par(mar = c(6, 6, 3, 1))
 vals_nv <- c(var(ests_nv), exact_var, mean(var_ests_nv))
 names(vals_nv) <- c("Actual Var\n(simulation)", "Exact Formula\n(has S_tau^2)", "Conservative\n(drops S_tau^2)")
 bp <- barplot(vals_nv, col = c("steelblue", "seagreen", "coral"),
@@ -832,7 +846,7 @@ When $S_\tau^2 = 0$, meaning the treatment effect is **constant** -- the same fo
 
 ### Visualizing: Constant vs Heterogeneous Effects
 
-```{r constant-vs-hetero, fig.height=4.5}
+```{r constant-vs-hetero, fig.height=5}
 N_ch <- 200
 Y0_ch <- rnorm(N_ch, 50, 10)
 
@@ -863,11 +877,13 @@ mtext(paste("S_tau^2 =", round(var(tau_hetero_ch), 2)), side = 3, line = 0, cex 
 
 ### The 95% Confidence Interval -- WHY It Covers 95%
 
+OK so we have an estimate ($\hat{\tau}$) and we know how much it bounces around (the variance formula). How do we turn that into a confidence interval? We need one more ingredient: a reason to believe the distribution of $\hat{\tau}$ is bell-shaped. That reason is the Finite-Population CLT -- a theorem that says "if you randomly shuffle people into two groups enough times, the distribution of the difference in means looks like a bell curve." Here is the full logic:
+
 $$\hat{\tau} \pm 1.96\sqrt{\widehat{\text{Var}}(\hat{\tau})}$$
 
 **The logic chain (three pieces):**
 
-**PIECE 1: The Finite-Population CLT.** Under complete randomization, as the sample size grows:
+**PIECE 1: The Finite-Population CLT.** This is the key theoretical result. Under complete randomization, as the sample size grows:
 
 $$\frac{\hat{\tau} - \tau}{\sqrt{\text{Var}(\hat{\tau})}} \xrightarrow{d} N(0,1)$$
 
@@ -881,7 +897,7 @@ $$\Pr(\tau \in \text{CI}) \ge 95\%$$
 
 ### Visualizing the 95% CI Coverage
 
-```{r ci-coverage, fig.height=5}
+```{r ci-coverage, fig.height=5.5}
 # Compute CIs across many randomizations, check how often they cover tau
 covers_ci <- logical(n_sims_nv)
 
@@ -933,6 +949,32 @@ legend("topright", legend = c("Covers true ATE", "Misses true ATE"),
 4. We overestimate the SD (because $S_\tau^2 \ge 0$ always), so we get $\ge$ 95% coverage
 5. This works for ANY population, ANY treatment effect distribution
 
+### Finite-Population CLT vs. i.i.d. CLT (know the contrast)
+
+There are two completely different reasons why the bell curve shows up. The exam may ask you to explain the difference.
+
+**Finite-Population CLT (FP-CLT) -- the one WE use in this class:**
+
+- Everyone's potential outcomes ($Y_i(1)$ and $Y_i(0)$) are **fixed numbers** that don't change. They are like heights written on everyone's forehead.
+- The **only** thing that is random is the coin flip that decides who gets treated.
+- Because treatment assignment is just a random shuffle of $N$ people into two groups, $\hat{\tau}$ is a sum of random terms: $\hat{\tau} = \sum a_i Z_i + b$. The $a_i$ and $b$ are constants (determined by the fixed potential outcomes).
+- As long as no single person dominates the variance and both groups are a reasonable fraction of $N$, the FP-CLT says the distribution of $\hat{\tau}$ is approximately bell-shaped.
+- Works with a **finite** group of people -- no need to pretend they came from some giant superpopulation.
+
+**i.i.d. CLT (Classical CLT) -- what you learned in intro stats:**
+
+- People are **random draws** from some giant (infinite) population.
+- Everything is random -- the outcomes, the covariates, the treatment.
+- The bell curve shows up because you are averaging many independent random things.
+- Requires assuming a probability model for outcomes (like "outcomes are normally distributed").
+
+| | FP-CLT (this class) | i.i.d. CLT (intro stats) |
+|---|--------|-----------|
+| What is random? | Only who gets treated ($Z_i$) | Everything: $Y_i, X_i, Z_i$ |
+| What is fixed? | Everyone's potential outcomes | Nothing -- all are random draws |
+| Population | Finite, specific group of $N$ people | Infinite superpopulation |
+| Where does variance come from? | The random treatment assignment | Random sampling from the population |
+
 ### Neyman vs. the classical two-sample t-test
 
 | | Neyman's approach | Classical t-test |
@@ -972,7 +1014,7 @@ Neyman's framework targets the weak null (estimating/testing $\tau = 0$). Fisher
 
 ### Visualizing Fisher's Randomization Test
 
-```{r fisher-test, fig.height=4.5}
+```{r fisher-test, fig.height=5}
 # ----- Small experiment: 8 people, 4 treated -----
 Y_obs_f <- c(8, 6, 7, 9, 4, 6, 5, 3)
 N_f <- 8; n1_f <- 4
@@ -1009,25 +1051,31 @@ legend("topright",
 
 **Type I error, Type II error, Power:** Type I error = rejecting $H_0$ when it is true (probability $\alpha$, the significance level). Type II error = failing to reject when $H_0$ is false. Power = $1 - \text{Type II error rate}$ = probability of correctly detecting a real effect.
 
-**Randomization tests are NOT the same as permutation tests.** They look identical computationally, but the justification is different. A permutation test assumes exchangeability (a distributional assumption). A randomization test relies on the fact that you actually randomized.
+**Randomization tests are NOT the same as permutation tests.** They look identical when you run them on a computer -- same calculation. But the reasoning behind them is different. A permutation test assumes the data are exchangeable (a statistical assumption about the distribution). A randomization test doesn't assume anything about the data -- it works because YOU actually randomized the treatment. The validity comes from the experiment design, not from a model.
 
 ## 5.8 Constant Additive Treatment Effects
 
+This means the treatment does the exact same thing to everyone -- adds exactly $\tau$ to every person's outcome:
+
 $$Y_i(1) = Y_i(0) + \tau \quad \text{for all } i$$
+
+If a drug lowers blood pressure by exactly 10 for everyone (not 15 for some and 5 for others), that is a constant additive effect.
 
 ### Testing a specific value of $\tau$
 
-Want to test $H_0: \tau = \tau_0$? Create adjusted outcomes: $Y_i^{(\tau_0)} = Y_i^{\text{obs}} - Z_i \cdot \tau_0$
+Suppose someone claims the treatment effect is $\tau_0 = 5$. Can you test that? Yes:
 
-If the true effect is $\tau_0$, then the adjusted outcomes satisfy Fisher's sharp null. Run the randomization test on adjusted data.
+1. Subtract the claimed effect from every treated person's outcome: $Y_i^{(\tau_0)} = Y_i^{\text{obs}} - Z_i \cdot \tau_0$
+2. If the claim is right, these adjusted outcomes should show NO treatment effect (because you subtracted it out)
+3. Run Fisher's randomization test on the adjusted data. If the p-value is small, the claim $\tau = \tau_0$ is rejected.
 
 ### Confidence Intervals by Inversion
 
-Try a bunch of values of $\tau_0$. For each one, run the test. Keep all non-rejected values:
+This is a cool trick. Try a whole range of possible $\tau_0$ values: 1, 2, 3, 4, ... For each one, do the test above. Collect all the values that were NOT rejected:
 
 $$\mathcal{C}_{1-\alpha} = \{\tau_0 : p(\tau_0) > \alpha\}$$
 
-Properties: exact in finite samples, no normality assumptions, comes from the design.
+That set IS your confidence interval. It contains every value of the treatment effect that is consistent with your data. Properties: exact (not approximate), works in any sample size, no normality needed.
 
 ## 5.9 Choice of Test Statistics
 
@@ -1130,7 +1178,7 @@ where $j(i)$ is the matched control for treated person $i$, and $n_M$ is the num
 
 ### Visualizing Matching: Before and After
 
-```{r matching-visual, fig.height=4.5}
+```{r matching-visual, fig.height=5.5}
 # ----- Simple 1D matching example -----
 n_t_m <- 15; n_c_m <- 40
 X_t_m <- rnorm(n_t_m, 55, 8)
@@ -1144,7 +1192,7 @@ for (i in 1:n_t_m) {
 }
 X_c_matched_m <- X_c_m[matched_c_m]
 
-par(mfrow = c(1, 2), mar = c(4, 4, 3, 1))
+par(mfrow = c(1, 2), mar = c(5.5, 4, 3, 1))
 
 # Before matching
 plot(density(X_t_m), col = "firebrick", lwd = 2, xlim = range(c(X_t_m, X_c_m)),
@@ -1153,7 +1201,7 @@ lines(density(X_c_m), col = "steelblue", lwd = 2)
 legend("topright", legend = c("Treated", "Control"),
        col = c("firebrick", "steelblue"), lwd = 2, bty = "n")
 smd_before_m <- (mean(X_t_m) - mean(X_c_m)) / sqrt((var(X_t_m) + var(X_c_m)) / 2)
-mtext(paste("SMD =", round(smd_before_m, 3)), side = 1, line = 2.8, cex = 0.8)
+mtext(paste("SMD =", round(smd_before_m, 3)), side = 1, line = 4, cex = 0.8)
 
 # After matching
 plot(density(X_t_m), col = "firebrick", lwd = 2, xlim = range(c(X_t_m, X_c_m)),
@@ -1162,7 +1210,7 @@ lines(density(X_c_matched_m), col = "steelblue", lwd = 2)
 legend("topright", legend = c("Treated", "Matched Control"),
        col = c("firebrick", "steelblue"), lwd = 2, bty = "n")
 smd_after_m <- (mean(X_t_m) - mean(X_c_matched_m)) / sqrt((var(X_t_m) + var(X_c_matched_m)) / 2)
-mtext(paste("SMD =", round(smd_after_m, 3)), side = 1, line = 2.8, cex = 0.8)
+mtext(paste("SMD =", round(smd_after_m, 3)), side = 1, line = 4, cex = 0.8)
 ```
 
 **What you see:** Before matching, the age distributions are shifted apart (large SMD). After matching, they overlap closely (SMD near 0). Matching created comparable groups.
@@ -1254,39 +1302,155 @@ legend("topright", legend = c("Before matching", "After matching", "Threshold: 0
 
 ## 7.5 Why Matching Reduces Bias
 
-Under a model where $Y_i = \tau Z_i + g(X_i) + \varepsilon_i$:
+The idea is simple: if your matched pair has very similar background characteristics, then whatever effect those characteristics have on the outcome is basically the same for both people in the pair. So when you subtract their outcomes, the background effect cancels and you are left with mostly just the treatment effect.
+
+Formally, under a model where $Y_i = \tau Z_i + g(X_i) + \varepsilon_i$ (the outcome depends on treatment plus some function of background):
 
 $$\text{Bias} = \frac{1}{n_M}\sum_{i=1}^{n_M}\big(g(X_i) - g(X_{j(i)})\big)$$
 
-If the matched pair has similar covariates ($X_i \approx X_{j(i)}$), and $g$ is smooth, then $g(X_i) \approx g(X_{j(i)})$ and the bias from each pair is tiny.
+If person $i$ and their match $j(i)$ have similar $X$ values, then $g(X_i) \approx g(X_{j(i)})$ and each pair contributes almost zero bias. The closer the matches, the smaller the bias.
 
 ### The Chebyshev-type bias bound
 
+This formula puts a ceiling on how bad the bias can be:
+
 $$|\text{Bias}| \le L\big(|\Delta_X^M| + 2s_D\big)$$
 
-where:
+In plain English:
 
-- $L$ = Lipschitz constant (max steepness of $g$). You cannot control this.
-- $\Delta_X^M$ = average covariate difference in matched pairs. You CAN control this.
-- $s_D$ = standard deviation of pairwise differences. You CAN control this.
+- $L$ = how steeply the outcome changes with $X$. You have no control over this -- it is a property of the real world.
+- $\Delta_X^M$ = the average gap between matched pairs on $X$. Better matches = smaller gap = you CAN control this.
+- $s_D$ = how inconsistent your match quality is across pairs. You CAN control this too.
+
+So the message is: make your matches as close as possible (small $\Delta_X^M$) and as consistently close as possible (small $s_D$), and you keep the bias small.
 
 ## 7.6 Exact Balance vs. Near-Fine Balance
 
-**Exact balance:** Distribution of a covariate is identical across groups. Hard to achieve for many covariates.
+**Exact balance:** The treated and control groups have the EXACT same distribution of a covariate (e.g., same % male, same % married). In practice this is hard to pull off for many covariates at once.
 
-**Near-fine balance:** Distributions are approximately equal (SMD < 0.1). Usually good enough.
+**Near-fine balance:** The distributions are close ENOUGH (SMD < 0.1). Not perfect, but good enough for reliable estimates.
 
-**Why the distinction matters:** Exact matching on a categorical variable (like race) can worsen balance on other covariates (forces within-category matches when categories are sparse). **Near-fine balance** relaxes this: enforces marginal distribution balance while allowing cross-category matches.
+**Why you can't always insist on exact:** Suppose you require exact matching on race. If there are very few treated Black units, you might be forced to pair them with distant controls just to stay within-race -- making the match terrible on age, income, etc. **Near-fine balance** is a compromise: it makes sure the overall % of each race is similar across groups, but allows individual pairs to be cross-race if that gives better matches on other variables.
 
 ## 7.7 Mahalanobis Distance and the Curse of Dimensionality
 
 $$d_M(X_i, X_j) = \sqrt{(X_i - X_j)^\top \hat{\Sigma}^{-1} (X_i - X_j)}$$
 
-Normalizes by the covariance matrix, putting all covariates on equal footing.
+Regular distance treats all variables the same, which is a problem -- a 1-year age difference and a $1 income difference are very different things. Mahalanobis distance fixes this by rescaling each variable by how spread out it is and accounting for correlations between variables. It puts everything on a fair, apples-to-apples scale.
 
-**The curse of dimensionality:** As the number of covariates grows, all points become roughly equally far apart, so "nearest neighbor" is not actually close. This is why the propensity score (one dimension) becomes essential.
+**The curse of dimensionality:** Here is a practical problem. When you have a ton of covariates (age, income, education, health, gender, ...), "closest neighbor" stops being actually close. With 20 variables, even the "nearest" control person might be pretty different from the treated person on several of those 20 dimensions. This is why collapsing everything into one number -- the propensity score -- becomes essential. Instead of matching on 20 things, you match on one number.
 
 **Hybrid approach:** Mahalanobis distance on key covariates + propensity score caliper.
+
+### Composite distance with categorical penalty
+
+Sometimes you have a mix of number-based variables (age, income) and category-based variables (race, gender). You can build a distance that handles both by adding a penalty whenever two people are in different categories:
+
+$$d\big((X_i, W_i), (X_j, W_j)\big) = (X_i - X_j)^2 + \lambda \cdot \mathbf{1}\{W_i \ne W_j\}$$
+
+The first part is the usual distance on continuous $X$. The second part adds a penalty of $\lambda$ whenever the categories don't match (e.g., different race). Make $\lambda$ big and the algorithm strongly prefers same-category matches. Make it small and it mostly ignores categories. This is more flexible than requiring exact category matches -- it is a "soft preference" you can tune.
+
+### Worked optimal matching example (exam-style)
+
+```{r optimal-matching-visual, fig.height=7, fig.width=9}
+# ----- Data -----
+treated <- data.frame(unit = 1:3, X = c(2.0, 3.5, 5.0))
+control <- data.frame(unit = 4:6, X = c(1.8, 3.0, 4.9))
+
+# Distance matrix
+dist_mat <- outer(treated$X, control$X, function(a, b) abs(a - b))
+
+# Optimal matches (by inspection: minimize total distance)
+matches <- data.frame(t_unit = 1:3, c_unit = 4:6,
+                      t_x = treated$X, c_x = control$X,
+                      dist = c(0.2, 0.5, 0.1))
+
+layout(matrix(c(1, 1, 2, 3), nrow = 2, byrow = TRUE), heights = c(1.2, 1))
+
+# ----- Panel 1: Number line showing units and matches -----
+par(mar = c(4, 2, 3, 2))
+plot(NA, xlim = c(1, 6), ylim = c(-1.5, 2.5), xlab = "Covariate X", ylab = "",
+     yaxt = "n", main = "Optimal 1:1 Matching: Who Gets Paired With Whom?",
+     cex.main = 1.3)
+
+# Draw the number line
+abline(h = 0, col = "gray80", lwd = 1)
+
+# Plot treated units (top)
+points(treated$X, rep(1, 3), pch = 17, col = "firebrick", cex = 2.5)
+text(treated$X, rep(1.6, 3),
+     labels = paste0("T", treated$unit, "\n(X=", treated$X, ")"),
+     col = "firebrick", cex = 0.9, font = 2)
+
+# Plot control units (bottom)
+points(control$X, rep(-0.5, 3), pch = 16, col = "steelblue", cex = 2.5)
+text(control$X, rep(-1.2, 3),
+     labels = paste0("C", control$unit, "\n(X=", control$X, ")"),
+     col = "steelblue", cex = 0.9, font = 2)
+
+# Draw match arrows with distance labels
+match_cols <- c("darkorange", "purple3", "seagreen")
+for (i in 1:3) {
+  arrows(matches$t_x[i], 0.75, matches$c_x[i], -0.25,
+         col = match_cols[i], lwd = 3, length = 0.12)
+  mid_x <- (matches$t_x[i] + matches$c_x[i]) / 2
+  text(mid_x + 0.15, 0.25,
+       labels = paste0("d=", matches$dist[i]),
+       col = match_cols[i], cex = 1, font = 2)
+}
+
+legend("topright",
+       legend = c("Treated", "Control", paste0("Match (d=", matches$dist, ")")),
+       pch = c(17, 16, NA, NA, NA), lwd = c(NA, NA, 3, 3, 3),
+       col = c("firebrick", "steelblue", match_cols),
+       bty = "n", cex = 0.85)
+mtext("Total distance = 0.2 + 0.5 + 0.1 = 0.8    Avg = 0.267", side = 1, line = 2.5, cex = 0.9)
+
+# ----- Panel 2: Distance matrix as a heatmap -----
+par(mar = c(4, 5, 3, 2))
+image(1:3, 1:3, dist_mat, col = colorRampPalette(c("white", "steelblue", "firebrick"))(20),
+      xlab = "", ylab = "", axes = FALSE,
+      main = "Distance Matrix (lighter = closer)")
+axis(1, at = 1:3, labels = paste0("C", 4:6, " (", control$X, ")"), cex.axis = 0.9)
+axis(2, at = 1:3, labels = paste0("T", 1:3, " (", treated$X, ")"), las = 1, cex.axis = 0.9)
+
+# Add distance values to cells
+for (i in 1:3) {
+  for (j in 1:3) {
+    is_match <- (i == j)  # diagonal = optimal match
+    text(j, i, round(dist_mat[i, j], 1),
+         cex = ifelse(is_match, 1.4, 1),
+         font = ifelse(is_match, 2, 1),
+         col = ifelse(is_match, "white", "black"))
+    if (is_match) {
+      rect(j - 0.45, i - 0.45, j + 0.45, i + 0.45, border = "gold", lwd = 3)
+    }
+  }
+}
+legend("right", legend = "Optimal match", border = "gold", fill = NA, lwd = 3, bty = "n", cex = 0.8)
+
+# ----- Panel 3: Why this matching is optimal -----
+par(mar = c(4, 4, 3, 2))
+all_matchings <- list(
+  c("(1,4) (2,5) (3,6)", 0.2 + 0.5 + 0.1),
+  c("(1,4) (2,6) (3,5)", 0.2 + 1.4 + 2.0),
+  c("(1,5) (2,4) (3,6)", 1.0 + 1.7 + 0.1),
+  c("(1,5) (2,6) (3,4)", 1.0 + 1.4 + 3.2),
+  c("(1,6) (2,4) (3,5)", 2.9 + 1.7 + 2.0),
+  c("(1,6) (2,5) (3,4)", 2.9 + 0.5 + 3.2)
+)
+labels <- sapply(all_matchings, `[[`, 1)
+totals <- as.numeric(sapply(all_matchings, `[[`, 2))
+cols <- ifelse(totals == min(totals), "seagreen", "gray70")
+
+bp <- barplot(totals, names.arg = labels, col = cols, las = 2, cex.names = 0.7,
+              main = "All Possible Matchings\n(green = best)",
+              ylab = "Total Distance", ylim = c(0, max(totals) * 1.15))
+text(bp, totals, labels = round(totals, 1), pos = 3, cex = 0.9)
+abline(h = min(totals), lty = 2, col = "seagreen", lwd = 2)
+```
+
+**What you see:** The top panel shows all 6 units on a number line -- treated (triangles) on top, control (circles) on bottom -- with colored arrows connecting matched pairs. The heatmap shows the full distance matrix (lighter = closer match, gold boxes = the pairs we picked). The bar chart proves this IS the best matching by comparing the total distance of all 6 possible pairings.
 
 ## 7.8 1:1 vs. 1:k Matching: The Bias-Variance Trade-off
 
@@ -1296,7 +1460,7 @@ Normalizes by the covariance matrix, putting all covariates on equal footing.
 
 ### Visualizing the Bias-Variance Trade-off
 
-```{r matching-1k, fig.height=4.5}
+```{r matching-1k, fig.height=5.5}
 N_t_1k <- 50; N_c_1k <- 200
 n_sims_1k <- 2000
 
@@ -1323,7 +1487,7 @@ match_1k <- function(k) {
 
 est_1_1k <- match_1k(1); est_2_1k <- match_1k(2); est_5_1k <- match_1k(5)
 
-par(mar = c(5, 4, 3, 1))
+par(mar = c(6, 4, 3, 1))
 boxplot(list("1:1" = est_1_1k, "1:2" = est_2_1k, "1:5" = est_5_1k),
         col = c("steelblue", "mediumpurple", "coral"),
         main = "1:k Matching: Bias-Variance Trade-off",
@@ -1334,7 +1498,7 @@ legend("topright", legend = "True ATE = 5", lty = 2, col = "seagreen", lwd = 2, 
 for (i in 1:3) {
   ests_i <- list(est_1_1k, est_2_1k, est_5_1k)[[i]]
   mtext(paste0("Var=", round(var(ests_i), 2), " Bias=", round(mean(ests_i) - 5, 2)),
-        side = 1, at = i, line = 3, cex = 0.65)
+        side = 1, at = i, line = 4.2, cex = 0.65)
 }
 ```
 
@@ -1350,21 +1514,21 @@ In observational data, if you just compare treated and untreated groups:
 
 $$\mathbb{E}[Y \mid Z=1] - \mathbb{E}[Y \mid Z=0] = \underbrace{\mathbb{E}[Y(1) - Y(0) \mid Z=1]}_{\text{ATT}} + \underbrace{\mathbb{E}[Y(0) \mid Z=1] - \mathbb{E}[Y(0) \mid Z=0]}_{\text{selection bias}}$$
 
-**How to derive this (exam-ready, add-and-subtract trick):**
+**How to derive this (exam-ready, the add-and-subtract trick):**
 
-Start: $\mathbb{E}[Y \mid Z\!=\!1] - \mathbb{E}[Y \mid Z\!=\!0]$. By SUTVA/consistency, $Y_i = Y_i(Z_i)$, so $\mathbb{E}[Y \mid Z\!=\!1] = \mathbb{E}[Y(1) \mid Z\!=\!1]$ and $\mathbb{E}[Y \mid Z\!=\!0] = \mathbb{E}[Y(0) \mid Z\!=\!0]$.
+Start with what you can actually compute: $\mathbb{E}[Y \mid Z\!=\!1] - \mathbb{E}[Y \mid Z\!=\!0]$ (average outcome of treated minus average outcome of controls).
 
-Now add and subtract $\mathbb{E}[Y(0) \mid Z\!=\!1]$:
+Step 1 (SUTVA): Since treated people show us their $Y(1)$ and controls show us their $Y(0)$: $\mathbb{E}[Y \mid Z\!=\!1] = \mathbb{E}[Y(1) \mid Z\!=\!1]$ and $\mathbb{E}[Y \mid Z\!=\!0] = \mathbb{E}[Y(0) \mid Z\!=\!0]$.
 
-$$= \mathbb{E}[Y(1) \mid Z\!=\!1] - \mathbb{E}[Y(0) \mid Z\!=\!1] + \mathbb{E}[Y(0) \mid Z\!=\!1] - \mathbb{E}[Y(0) \mid Z\!=\!0]$$
+Step 2 (the trick): Add and subtract $\mathbb{E}[Y(0) \mid Z\!=\!1]$ -- this is "what would have happened to the treated people if they had NOT been treated." We never see this, but adding and subtracting the same thing is always legal:
 
-$$= \text{ATT} + \text{selection bias}$$
+$$= \underbrace{\mathbb{E}[Y(1) \mid Z\!=\!1] - \mathbb{E}[Y(0) \mid Z\!=\!1]}_{\text{ATT: actual treatment effect on the treated}} + \underbrace{\mathbb{E}[Y(0) \mid Z\!=\!1] - \mathbb{E}[Y(0) \mid Z\!=\!0]}_{\text{selection bias: treated were already different}}$$
 
-The **selection bias** is the difference in baseline (untreated) outcomes between the groups. It exists because people who choose treatment are different from those who don't, **even before treatment**.
+The **selection bias** is asking: even WITHOUT treatment, would the treated group have had different outcomes than the control group? If yes, your naive comparison is picking up that pre-existing difference on top of the treatment effect.
 
 ### Visualizing Selection Bias
 
-```{r selection-bias, fig.height=4.5}
+```{r selection-bias, fig.height=5.5}
 N_sb <- 1000
 health <- rnorm(N_sb, 50, 10)  # confounder
 Z_sb <- rbinom(N_sb, 1, plogis(-3 + 0.06 * health))  # healthier people exercise more
@@ -1375,7 +1539,7 @@ Y_sb <- ifelse(Z_sb == 1, Y1_sb, Y0_sb)
 naive_est <- mean(Y_sb[Z_sb == 1]) - mean(Y_sb[Z_sb == 0])
 selection_bias <- naive_est - 3
 
-par(mfrow = c(1, 2), mar = c(4, 4, 3, 1))
+par(mfrow = c(1, 2), mar = c(5, 4, 3, 1))
 
 # Panel 1: confounder distributions
 plot(density(health[Z_sb == 1]), col = "firebrick", lwd = 2, xlim = range(health),
@@ -1384,7 +1548,7 @@ plot(density(health[Z_sb == 1]), col = "firebrick", lwd = 2, xlim = range(health
 lines(density(health[Z_sb == 0]), col = "steelblue", lwd = 2)
 legend("topleft", legend = c("Treated (exercisers)", "Control (non-exercisers)"),
        col = c("firebrick", "steelblue"), lwd = 2, bty = "n", cex = 0.8)
-mtext("Treated group is healthier at baseline!", cex = 0.7, col = "gray30")
+mtext("Treated group is healthier at baseline!", side = 1, line = 3.8, cex = 0.7, col = "gray30")
 
 # Panel 2: decomposition
 vals_sb <- c(naive_est, 3, selection_bias)
@@ -1419,13 +1583,15 @@ Person $i$'s outcome depends only on whether **they** were treated, not on wheth
 
 $$(Y(1), Y(0)) \perp\!\!\!\perp Z \mid X$$
 
-Once you account for $X$, treatment assignment is essentially random. **Impossible to verify from data.** Must be justified by subject-matter knowledge.
+In plain English: among people with the **same** background characteristics $X$, who gets treated is basically random. If you compare two 45-year-old college-educated men, one treated and one not, the treated one is not systematically different in any way that matters for the outcome.
+
+Another way to say it: after you account for everything in $X$, there is nothing left that is driving both treatment and outcome. **You cannot test this from data** -- you have to argue it from your knowledge of the situation.
 
 ### Assumption 2: Overlap (Positivity)
 
 $$0 < \Pr(Z = 1 \mid X = x) < 1 \quad \text{for all } x$$
 
-For every type of person, there is a nonzero chance of being in either group. If some people are ALWAYS treated, there are no controls to compare them to.
+For every type of person (every combination of background characteristics), there has to be SOME chance they could have ended up in either group. If 100% of young men get treated and 0% don't, there are no untreated young men to compare to -- you are stuck. You need people in BOTH groups for every "type" of person.
 
 ### Assumption 3: SUTVA
 
@@ -1435,7 +1601,7 @@ No interference, no hidden versions (covered above).
 
 Some lectures use the term **strong ignorability** to mean assumptions 1 and 2 combined. If someone says "assume strong ignorability," they mean both $(Y(1), Y(0)) \perp\!\!\!\perp Z \mid X$ AND $0 < \Pr(Z\!=\!1 \mid X) < 1$.
 
-**Notation reminder:** $A \perp\!\!\!\perp B \mid C$ means $\Pr(A \mid B, C) = \Pr(A \mid C)$. Conditional on $C$, knowing $B$ gives you no additional information about $A$.
+**Notation reminder:** $A \perp\!\!\!\perp B \mid C$ means "if you already know $C$, then learning $B$ tells you nothing new about $A$." For example, if $C$ = your background, $B$ = whether you got treated, and $A$ = your potential outcomes: once I know your background, finding out whether you actually got treated doesn't change my prediction of your outcomes.
 
 ## 8.4 Identification: How These Assumptions Let You Estimate Causal Effects
 
@@ -1443,15 +1609,30 @@ Under these three assumptions:
 
 $$\tau = \mathbb{E}\Big[\mathbb{E}[Y \mid Z=1, X] - \mathbb{E}[Y \mid Z=0, X]\Big]$$
 
-**The logic (important for the exam):**
+**The logic (important for the exam -- know this chain):**
 
-1. $\mathbb{E}[Y(1)] = \mathbb{E}\big[\mathbb{E}[Y(1) \mid X]\big]$ -- (tower property)
-2. $= \mathbb{E}\big[\mathbb{E}[Y(1) \mid Z=1, X]\big]$ -- (ignorability)
-3. $= \mathbb{E}\big[\mathbb{E}[Y \mid Z=1, X]\big]$ -- (consistency + overlap)
+What we want: $\mathbb{E}[Y(1)]$ -- the average outcome if everyone were treated. We can never see this directly. But we CAN get it from observable data:
 
-Same for $Y(0)$. Subtracting: $\tau = \mathbb{E}\big[\mathbb{E}[Y \mid Z=1, X] - \mathbb{E}[Y \mid Z=0, X]\big]$.
+1. $\mathbb{E}[Y(1)] = \mathbb{E}\big[\mathbb{E}[Y(1) \mid X]\big]$ -- start by breaking the overall average into subgroup averages (tower property: "average of the averages")
+2. $= \mathbb{E}\big[\mathbb{E}[Y(1) \mid Z=1, X]\big]$ -- ignorability lets us add "$Z=1$" without changing anything (within each $X$ group, treatment is as-good-as-random, so conditioning on getting treated doesn't bias things)
+3. $= \mathbb{E}\big[\mathbb{E}[Y \mid Z=1, X]\big]$ -- consistency: for treated people, $Y = Y(1)$, so we swap the unobservable $Y(1)$ for the actual observed outcome $Y$
 
-**The key insight:** Under these assumptions, you can replace **unobservable** potential outcomes with **observable** conditional means.
+Do the same thing for $Y(0)$ (conditioning on $Z=0$). Subtract: $\tau = \mathbb{E}\big[\mathbb{E}[Y \mid Z=1, X] - \mathbb{E}[Y \mid Z=0, X]\big]$.
+
+**The key insight:** We started with something we can never observe ($Y(1)$ for everyone) and ended up with something we CAN compute from data (average outcome of treated people vs. controls, within each $X$ group, averaged across all $X$ groups). The assumptions bridge the gap between the imaginary and the real.
+
+**Getting ATT and ATC:** Same idea, but you change who you average over:
+
+$$\text{ATT} = \mathbb{E}\big[\mathbb{E}[Y \mid Z\!=\!1, X] - \mathbb{E}[Y \mid Z\!=\!0, X] \;\big|\; Z = 1\big]$$
+$$\text{ATC} = \mathbb{E}\big[\mathbb{E}[Y \mid Z\!=\!1, X] - \mathbb{E}[Y \mid Z\!=\!0, X] \;\big|\; Z = 0\big]$$
+
+The inner comparison (treated vs. control outcomes for people with the same background) is the same. The difference is who you weight over at the end: ATT averages over the background distribution of the **treated** people, ATC over the **control** people, and ATE over **everyone**.
+
+**You can also do this with just the propensity score** instead of all of $X$:
+
+$$\tau = \mathbb{E}\big[\mathbb{E}[Y \mid Z\!=\!1, e(X)] - \mathbb{E}[Y \mid Z\!=\!0, e(X)]\big]$$
+
+This works because the balancing property says $(Y(1), Y(0)) \perp\!\!\!\perp Z \mid e(X)$ -- conditioning on the PS is enough, you don't need all of $X$.
 
 ## 8.5 The Propensity Score
 
@@ -1467,21 +1648,27 @@ The probability of getting treated, given your background.
 
 $$(Y(1), Y(0)) \perp\!\!\!\perp Z \mid e(X)$$
 
-You don't need to match on all covariates. Just match on this single number. Within groups of people who have the same propensity score, covariates are balanced.
+Instead of trying to match on 15 different covariates at once (age, income, education, race, ...), you can collapse all of them into this single number and match on that. If two people have the same propensity score, their covariates are balanced on average -- even though the two people might have different specific characteristics.
 
-It is the **coarsest balancing score** -- the simplest possible summary of $X$ that is sufficient for balance. (A **balancing score** is any function $b(X)$ such that $X \perp\!\!\!\perp Z \mid b(X)$. The full covariate vector $X$ is trivially a balancing score. The propensity score $e(X)$ is the coarsest -- the most compressed one that still works.)
+Think of it like a credit score: instead of a bank looking at your income, debt, payment history, etc. separately, they roll everything into one number. The propensity score does the same thing for treatment probability.
+
+It is the **coarsest balancing score** -- the most compressed summary of all your background info that still gets the job done. You could match on the full vector $X$ (that trivially works), but that is impractical with many variables. The propensity score is the minimum you need.
 
 ### Proof sketch of the balancing property (exam-ready)
 
-We want to show $X \perp\!\!\!\perp Z \mid e(X)$. Fix a propensity score value $p$. Among all people with $e(X) = p$:
+We want to show: within a group of people who all have the same propensity score, covariates are balanced between treated and control. In math: $X \perp\!\!\!\perp Z \mid e(X)$.
+
+Here is the idea. Take everyone with $e(X) = 0.3$ (30% chance of treatment). Within this group, **every** person has the same 30% chance of being treated, regardless of their specific $X$ values. So who gets treated is like a coin flip with probability 0.3 -- it has nothing to do with the specific covariates. Treated people within this group are basically a random subset.
+
+Formally: fix $e(X) = p$. Among all people with this PS value:
 
 $$\Pr(X = x \mid Z = 1, e(X) = p) = \frac{\Pr(Z=1 \mid X=x) \Pr(X=x)}{\Pr(Z=1 \mid e(X)=p)} = \frac{p \cdot \Pr(X = x)}{p} = \Pr(X = x \mid e(X) = p)$$
 
-The key step: $\Pr(Z=1 \mid X=x) = e(x) = p$ for everyone in this group, so it factors out and cancels. Within any PS stratum, treated people are a random draw from that stratum. So covariates are balanced.
+The key: $\Pr(Z=1 \mid X=x) = e(x) = p$ for everyone in this group (that is what it MEANS to have the same PS). So the $p$ in the numerator and denominator cancels, and the distribution of $X$ among the treated is the same as the distribution of $X$ in the whole group.
 
 ### Visualizing the Propensity Score
 
-```{r propensity-score, fig.height=4.5}
+```{r propensity-score, fig.height=5.5}
 N_ps <- 600
 age_ps  <- rnorm(N_ps, 45, 10)
 male_ps <- rbinom(N_ps, 1, 0.5)
@@ -1493,7 +1680,7 @@ Z_ps <- rbinom(N_ps, 1, plogis(lp_ps))
 ps_model <- glm(Z_ps ~ age_ps + male_ps + inc_ps, family = binomial)
 ps_vals <- fitted(ps_model)
 
-par(mfrow = c(1, 2), mar = c(4, 4, 3, 1))
+par(mfrow = c(1, 2), mar = c(5.5, 4, 3, 1))
 
 # Panel 1: PS histograms by group
 hist(ps_vals[Z_ps == 1], breaks = 25, col = adjustcolor("firebrick", 0.5),
@@ -1555,7 +1742,7 @@ $$\Pr(Z = 1 \mid X) = \frac{\exp(\alpha + \beta^\top X)}{1 + \exp(\alpha + \beta
 
 ### Visualizing the Pipeline
 
-```{r design-analysis, fig.height=6}
+```{r design-analysis, fig.height=6.5}
 par(mar = c(1, 1, 2, 1))
 plot(NA, xlim = c(0, 10), ylim = c(0, 10), xaxt = "n", yaxt = "n",
      xlab = "", ylab = "", main = "The Observational Study Pipeline", bty = "n")
@@ -1600,15 +1787,15 @@ text(7.5, 1.4, "Same logic here.", cex = 0.8)
 
 ## 9.2 Subclassification (Stratification)
 
-Divide the sample into strata based on $\hat{e}(X)$:
+Instead of matching individual pairs, you can sort everyone into buckets based on their propensity score (e.g., 5 groups: the bottom 20%, next 20%, etc.). Within each bucket, treated and control people have similar PS values, so they are roughly comparable. Then you compute the treatment effect within each bucket and take a weighted average:
 
 $$\hat{\tau}_{\text{strat}} = \sum_{k=1}^{K} \frac{N_k}{N} \left(\bar{Y}_{T,k} - \bar{Y}_{C,k}\right)$$
 
-Cochran (1968): 5 subclasses remove ~90% of bias (for normally distributed PS and linear outcomes). More strata = less bias but noisier.
+A classic result (Cochran 1968): just 5 buckets removes about 90% of the bias. More buckets = even less bias, but each bucket has fewer people in it so the estimates within each bucket get noisier.
 
-**Practical issue:** If one stratum has very few treated units (e.g., $n_1 = 1, n_0 = 42$), the within-stratum treatment effect is based on a single person -- huge variance. **Fix:** Merge that stratum with its neighbor, or reduce the number of strata.
+**Watch out for sparse buckets:** If one bucket has, say, 1 treated person and 42 controls, the treatment effect estimate for that bucket is based on a single person -- basically useless. **Fix:** Merge it with a neighboring bucket, or just use fewer buckets overall.
 
-**If the PS model is wrong:** Stratification on a misspecified PS can actually *worsen* balance compared to stratifying directly on raw covariates. The PS is only as good as the model behind it.
+**If your PS model is wrong:** Garbage in, garbage out. Stratifying on a badly estimated PS can actually make things WORSE than not stratifying at all. Always check balance within your strata.
 
 ## 9.3 Inverse Probability Weighting (IPW)
 
@@ -1630,36 +1817,74 @@ After reweighting, both groups look like the overall population.
 
 $$\hat{\tau}_{\text{IPW}} = \frac{1}{N}\sum_{i=1}^{N}\left[\frac{Z_i Y_i}{\hat{e}(X_i)} - \frac{(1-Z_i)Y_i}{1-\hat{e}(X_i)}\right]$$
 
+**IPW estimator for the ATT:**
+
+$$\hat{\tau}_{\text{ATT}} = \frac{1}{n_1}\sum_{i=1}^{N}\left[Z_i Y_i - \frac{\hat{e}(X_i)(1-Z_i)Y_i}{1-\hat{e}(X_i)}\right]$$
+
+The control group is reweighted so the reweighted controls look like the treated group. This is useful when the estimand of interest is the effect on those who actually received treatment.
+
 ### Why IPW is unbiased (key proof)
+
+The idea: when you divide by $e(X)$, the propensity score in the numerator (from $\mathbb{E}[Z \mid X] = e(X)$) cancels with the one in the denominator, leaving you with exactly what you want.
 
 $$\mathbb{E}\left[\frac{Z_i Y_i}{e(X_i)}\right] = \mathbb{E}\left[\frac{e(X_i) \cdot \mathbb{E}[Y_i(1) \mid X_i]}{e(X_i)}\right] = \mathbb{E}[Y_i(1)]$$
 
-The propensity score cancels perfectly.
+Step by step: use the tower property (condition on $X$ first). Given $X$, $Z$ is just a coin flip with probability $e(X)$, and $Y_i(1)$ is fixed. So $\mathbb{E}[Z_i Y_i(1) \mid X_i] = e(X_i) \cdot \mathbb{E}[Y_i(1) \mid X_i]$. Divide by $e(X_i)$ and the PS cancels perfectly.
 
 ### IPW achieves covariate balance as a theorem
 
-If the PS is correct, the IPW weighted covariate means converge to the same thing in both groups. **This is not a hope, it is a mathematical consequence.**
+If the PS is correct, the IPW-weighted treated group has the same average of EVERY covariate as the overall population. Same for the control group. **This is not a hope -- it is a guaranteed mathematical fact.**
 
-**Full proof (know this for the exam):** For any function $g(X)$:
+**Full proof (know this for the exam):** For any function $g(X)$ (could be $X$ itself, $X^2$, $\log X$, whatever):
 
-$$\mathbb{E}\left[\frac{Z \cdot g(X)}{e(X)}\right] = \mathbb{E}\left[\mathbb{E}\left[\frac{Z \cdot g(X)}{e(X)} \,\Big|\, X\right]\right] \quad\text{(tower property)}$$
+$$\mathbb{E}\left[\frac{Z \cdot g(X)}{e(X)}\right] = \mathbb{E}\left[\mathbb{E}\left[\frac{Z \cdot g(X)}{e(X)} \,\Big|\, X\right]\right] \quad\text{(tower property: break into subgroup averages)}$$
 
-$$= \mathbb{E}\left[\frac{g(X)}{e(X)} \cdot \mathbb{E}[Z \mid X]\right] \quad\text{(g(X) and e(X) are functions of X, so they come out)}$$
+$$= \mathbb{E}\left[\frac{g(X)}{e(X)} \cdot \mathbb{E}[Z \mid X]\right] \quad\text{(given X, g(X) and e(X) are just numbers, pull them out)}$$
 
 $$= \mathbb{E}\left[\frac{g(X)}{e(X)} \cdot e(X)\right] = \mathbb{E}[g(X)] \quad\text{(e(X) cancels!)}$$
 
 This works for ANY $g$: $g(X) = X$, $g(X) = X^2$, $g(X) = \sin(X)$, anything. So IPW-weighted treated group has the same mean of every function of covariates as the population. If this doesn't hold in your data, your PS model is wrong.
 
+### Expected value of IPW weights: E[w_i] = 2 (exam proof)
+
+Each person's IPW weight has two pieces: one for being treated ($Z/e(X)$) and one for being control ($(1-Z)/(1-e(X))$). Only one piece is ever "on" for a given person (either $Z=1$ or $Z=0$). But on average, each piece contributes 1, so the average weight is 2.
+
+Define the IPW weight for ATE as $w_i = \frac{Z_i}{e(X_i)} + \frac{1-Z_i}{1-e(X_i)}$. Then:
+
+$$\mathbb{E}[w_i] = \mathbb{E}\left[\mathbb{E}\left[\frac{Z_i}{e(X_i)} + \frac{1-Z_i}{1-e(X_i)} \;\Big|\; X_i\right]\right] \quad\text{(tower property)}$$
+
+Given $X_i$: $\mathbb{E}[Z_i/e(X_i) \mid X_i] = e(X_i)/e(X_i) = 1$, and $\mathbb{E}[(1-Z_i)/(1-e(X_i)) \mid X_i] = (1-e(X_i))/(1-e(X_i)) = 1$.
+
+So $\mathbb{E}[w_i] = \mathbb{E}[1 + 1] = 2$.
+
+### Effective Sample Size (ESS) -- why weight variability hurts
+
+Think of it this way: if one person has weight 100 and everyone else has weight 2, that one person basically IS your entire estimate. You technically have $N$ people in your sample, but it is as if you only have a few because one person's outcome is drowning out everyone else's.
+
+The **effective sample size** tells you how many equally-weighted people your weighted sample is actually worth:
+
+$$\text{ESS} \approx \frac{\left(\sum_{i=1}^{N} w_i\right)^2}{\sum_{i=1}^{N} w_i^2}$$
+
+If all weights are equal ($w_i = c$), then $\text{ESS} = (Nc)^2/(Nc^2) = N$ -- full sample. If a few weights are very large, $\sum w_i^2$ is dominated by the big ones and ESS shrinks dramatically.
+
+**Concrete example (from exam review):** Suppose $N$ units, half with $e(X) = 0.5$ and half with $e(X) = 0.01$.
+
+- Units with $e(X) = 0.5$: $w_i = Z_i/0.5 + (1-Z_i)/0.5 = 2$ regardless of treatment.
+- Units with $e(X) = 0.01$, treated ($Z_i = 1$): $w_i = 1/0.01 = 100$.
+- Units with $e(X) = 0.01$, control ($Z_i = 0$): $w_i = 1/0.99 \approx 1.01$.
+
+The treated units with $e(X) = 0.01$ have weight 100 -- they each "count" as much as 50 normal-weight units. These few extreme weights dominate $\sum w_i^2$, making ESS far smaller than $N$. The estimator is technically unbiased but practically useless due to enormous variance.
+
 ### Visualizing IPW: How Reweighting Creates Balance
 
-```{r ipw-weights, fig.height=4.5}
+```{r ipw-weights, fig.height=5.5}
 N_ipw <- 500
 X_ipw <- rnorm(N_ipw, 0, 1)
 ps_true_ipw <- plogis(1.5 * X_ipw)
 Z_ipw <- rbinom(N_ipw, 1, ps_true_ipw)
 w_ipw <- ifelse(Z_ipw == 1, 1 / ps_true_ipw, 1 / (1 - ps_true_ipw))
 
-par(mfrow = c(1, 2), mar = c(4, 4, 3, 1))
+par(mfrow = c(1, 2), mar = c(5, 4, 3, 1))
 
 # Panel 1: PS vs weight
 plot(ps_true_ipw, w_ipw, pch = 16,
@@ -1669,7 +1894,7 @@ plot(ps_true_ipw, w_ipw, pch = 16,
      xlab = expression(e(X)), ylab = "Weight (log scale)")
 legend("top", legend = c("Treated", "Control"),
        col = c("firebrick", "steelblue"), pch = 16, bty = "n")
-mtext("Near 0 or 1 = extreme weights!", cex = 0.7, col = "gray30")
+mtext("Near 0 or 1 = extreme weights!", side = 1, line = 3.8, cex = 0.7, col = "gray30")
 
 # Panel 2: balance before and after weighting
 mean_x_t_raw <- mean(X_ipw[Z_ipw == 1])
@@ -1681,10 +1906,11 @@ vals_ipw <- matrix(c(mean_x_t_raw, mean_x_c_raw, mean_x_t_ipw, mean_x_c_ipw),
                nrow = 2, dimnames = list(c("Treated", "Control"), c("Unweighted", "IPW-Weighted")))
 barplot(vals_ipw, beside = TRUE, col = c("firebrick", "steelblue"),
         main = "Covariate Mean of X by Group", ylab = "Mean of X")
-legend("topright", legend = c("Treated", "Control"),
-       fill = c("firebrick", "steelblue"), bty = "n")
 abline(h = mean(X_ipw), lty = 2, col = "seagreen", lwd = 2)
-legend("topleft", legend = "Population mean", lty = 2, col = "seagreen", lwd = 2, bty = "n")
+legend("topright", legend = c("Treated", "Control", "Population mean"),
+       fill = c("firebrick", "steelblue", NA), lty = c(NA, NA, 2),
+       col = c(NA, NA, "seagreen"), lwd = c(NA, NA, 2),
+       border = c("black", "black", NA), bty = "n", cex = 0.8)
 ```
 
 **What you see:** Left: when PS is near 0 or 1, weights explode (note log scale). Right: before weighting, treated has higher X. After IPW, both match the population mean (green dashed).
@@ -1695,7 +1921,7 @@ If $e(X) \approx 0$ or $1$, weights blow up. One person can dominate the entire 
 
 ### Visualizing Extreme Weights and the Overlap Problem
 
-```{r extreme-weights, fig.height=4.5}
+```{r extreme-weights, fig.height=5.5}
 N_ew <- 400
 X_ew <- c(rnorm(200, -1, 0.8), rnorm(200, 1, 0.8))
 ps_ew <- plogis(2 * X_ew)
@@ -1710,7 +1936,7 @@ keep_ew <- ps_ew > 0.1 & ps_ew < 0.9
 ipw_trimmed <- mean(Z_ew[keep_ew] * Y_ew[keep_ew] / ps_ew[keep_ew] -
                     (1 - Z_ew[keep_ew]) * Y_ew[keep_ew] / (1 - ps_ew[keep_ew]))
 
-par(mfrow = c(1, 2), mar = c(4, 4, 3, 1))
+par(mfrow = c(1, 2), mar = c(5, 4, 3, 1))
 
 # Panel 1: PS histogram showing poor overlap
 hist(ps_ew[Z_ew == 1], breaks = 30, col = adjustcolor("firebrick", 0.5),
@@ -1739,44 +1965,51 @@ abline(h = 3, lty = 2, col = "seagreen")
 
 ### Solutions to extreme weights
 
-**1. Trimming:** Drop people with extreme PS. Changes the estimand to the overlap subpopulation.
+**1. Trimming:** Just throw away people with extreme PS values (e.g., drop anyone with PS below 0.1 or above 0.9). The downside: you are now estimating the treatment effect for a smaller, more "in the middle" group -- not the full population. But at least the estimate is stable.
 
-**2. Stabilized weights:** $w_i^{stab} = Z_i \cdot \hat{p}/\hat{e}(X_i) + (1-Z_i)(1-\hat{p})/(1-\hat{e}(X_i))$ where $\hat{p} = n_1/N$. Multiplies by marginal probability of actual treatment.
+**2. Stabilized weights:** Instead of $1/e(X)$, multiply by the overall fraction treated: $w_i^{stab} = Z_i \cdot \hat{p}/\hat{e}(X_i) + (1-Z_i)(1-\hat{p})/(1-\hat{e}(X_i))$ where $\hat{p} = n_1/N$. This shrinks the extreme weights toward more reasonable values while keeping the balancing property. Think of it as: the raw weights ask "what if everyone were treated?" while stabilized weights ask "what if treatment were distributed proportionally?"
 
-**3. Hajek estimator:**
+**3. Hajek estimator:** Instead of summing up the weighted outcomes, divide by the sum of the weights:
 
 $$\hat{\tau}_{\text{Hajek}} = \frac{\sum Z_i Y_i / \hat{e}(X_i)}{\sum Z_i / \hat{e}(X_i)} - \frac{\sum (1-Z_i)Y_i / (1-\hat{e}(X_i))}{\sum (1-Z_i) / (1-\hat{e}(X_i))}$$
 
-Normalizes weights to sum to 1. Slightly biased but much lower variance.
+This forces the weights to add up to 1 in each group. Technically introduces a tiny bias, but WAY lower variance. Almost always better in practice.
 
 ## 9.5 Augmented Inverse Probability Weighting (AIPW) -- The "Best of Both Worlds"
 
-AIPW (the **doubly robust** estimator) combines IPW with outcome modeling.
+Here is the problem: regression needs the outcome model to be right, IPW needs the PS model to be right. What if you are not sure which one you got right? AIPW gives you **two chances** -- it works if EITHER model is correct.
 
-| Method | What it needs | Weakness |
+| Method | What it needs to be right | What goes wrong if it is wrong |
 |--------|--------------|----------|
-| Outcome regression | Outcome model correct | Wrong model = wrong answer |
-| IPW | PS model correct | Wrong PS = wrong answer; extreme weights |
+| Outcome regression | The outcome model (how $Y$ depends on $X$) | Wrong model = biased estimate |
+| IPW | The PS model (how $Z$ depends on $X$) | Wrong PS = bad weights = biased and noisy |
+| **AIPW** | **EITHER one** | Only fails if BOTH are wrong |
 
 ### The AIPW estimator
 
 $$\hat{\tau}_{\text{AIPW}} = \frac{1}{N}\sum_{i=1}^{N}\left[\hat{\mu}_1(X_i) - \hat{\mu}_0(X_i) + \frac{Z_i(Y_i - \hat{\mu}_1(X_i))}{\hat{e}(X_i)} - \frac{(1-Z_i)(Y_i - \hat{\mu}_0(X_i))}{1-\hat{e}(X_i)}\right]$$
 
-**4 terms:** (1) predicted outcome under treatment, (2) minus predicted under control = regression estimate. (3) IPW correction for treated residuals. (4) IPW correction for control residuals.
+**Read the 4 terms in English:**
 
-**The self-correcting mechanism:**
+- $\hat{\mu}_1(X_i)$: your best prediction of what $Y$ would be if person $i$ were treated (from the outcome model)
+- $\hat{\mu}_0(X_i)$: your best prediction if they were NOT treated
+- $\hat{\mu}_1 - \hat{\mu}_0$: the regression-based estimate of the treatment effect
+- $Z_i(Y_i - \hat{\mu}_1)/\hat{e}$: "how wrong was my prediction for this treated person, weighted by IPW." This is the correction term -- if the outcome model was off, this catches the error.
+- $(1-Z_i)(Y_i - \hat{\mu}_0)/(1-\hat{e})$: same correction for control people.
 
-- If the regression is perfect: residuals are zero, IPW correction vanishes. PS doesn't even matter.
-- If the regression is terrible but PS is correct: IPW correction fixes it.
-- If both are pretty good: you get better than either alone.
+**How it self-corrects:**
+
+- If the regression is perfect: $Y_i - \hat{\mu}_1 = 0$ for treated people, the correction terms vanish, and you just get the regression answer. The PS model does not even matter.
+- If the regression is garbage but PS is correct: the correction terms ($Y - \hat{\mu}$ divided by PS) rescue the estimate by reweighting the errors.
+- If both are decent: you get something better than either alone.
 
 ### The "doubly robust" property
 
-Consistent if **either** the outcome model or the PS model is correct. You get two shots at being right.
+Gives you the right answer if **either** model is correct. You get two shots at being right. Only fails if you screw up both models.
 
 ### Visualizing AIPW: Double Robustness
 
-```{r aipw, fig.height=4.5}
+```{r aipw, fig.height=5.5}
 N_aipw <- 800
 X_aipw <- rnorm(N_aipw, 0, 1)
 ps_aipw <- plogis(0.5 * X_aipw)
@@ -1816,14 +2049,15 @@ mtext("Outcome model is WRONG (linear for nonlinear truth). PS model is CORRECT.
 
 ## 9.6 Reading R Code on the Exam
 
-Practice problems Q26-Q30 ask you to interpret R code. Here is what each piece does:
+The exam will probably give you R output and ask you to interpret it. Here is a cheat sheet for reading each piece:
 
 **Propensity score model:**
 ```r
 glm(formula = Z ~ age + education + married, family = binomial, data = df)
 ```
-Logistic regression predicting treatment from covariates. Fitted values = estimated PS.
-Coefficients describe SELECTION (who gets treated), NOT causal effects.
+This is logistic regression predicting who gets treated based on their background. The fitted values are the estimated propensity scores.
+
+IMPORTANT: the coefficients tell you what predicts **getting treated** (selection into treatment), NOT what the treatment does to outcomes. A positive coefficient on `age` means older people are more likely to be treated -- it says nothing about whether the treatment helps or hurts older people.
 
 **Distance structure for matching (approxmatch):**
 ```r
@@ -1831,14 +2065,24 @@ components <- list(mahal = c("age","education"), ps = "ps_logit")
 wgts <- c(1, 2)
 dist_str <- multigrp_dist_struc(df, "Z", components, wgts)
 ```
-`wgts <- c(1, 2)` means PS gets **twice** the weight of Mahalanobis.
+This builds a distance that combines two things: Mahalanobis distance on age and education, and propensity score distance. The `wgts <- c(1, 2)` means the PS component gets **twice** the weight of the Mahalanobis component -- so the algorithm cares more about matching on PS than on raw covariates.
 
 **Matching:**
 ```r
 res <- kwaymatching(dist_str, "Z", indexgroup = "treated", design = c(1,1), .data = df)
 ```
-`design = c(1,1)` = 1:1 matching. `design = c(1,2)` = 1:2 matching.
-`exactmatchon = "race"` forces exact matching. `finebalanceVars = "race"` enforces marginal balance.
+`design = c(1,1)` = 1:1 matching (each treated person gets one control match). `design = c(1,2)` = 1:2 matching (each treated person gets two controls).
+`exactmatchon = "race"` means "only match people of the same race." `finebalanceVars = "race"` is softer -- it just makes sure the overall race distribution is similar in both groups.
+
+**Regression-based ATE in R:**
+```r
+m1 <- lm(Y ~ age + educ + married, data = df[df$Z==1,])  # fit a model using ONLY treated people
+m0 <- lm(Y ~ age + educ + married, data = df[df$Z==0,])  # fit a model using ONLY control people
+mu1 <- predict(m1, df)  # use treated model to predict outcome for EVERYONE
+mu0 <- predict(m0, df)  # use control model to predict outcome for EVERYONE
+ATE_reg <- mean(mu1 - mu0)  # average the predicted difference
+```
+The idea: build two separate prediction models (one for how outcomes look under treatment, one for control), then use both to predict outcomes for every person, and take the average difference. This is the "regression-based identification" approach: $\hat{\tau} = \frac{1}{N}\sum[\hat{\mu}_1(X_i) - \hat{\mu}_0(X_i)]$.
 
 **IPW in R:**
 ```r
@@ -1852,12 +2096,14 @@ tau_aipw <- mean(mu1 - mu0 + Z*(Y-mu1)/ps - (1-Z)*(Y-mu0)/(1-ps))
 
 ## 9.7 Diagnostics: How Do You Know It's Working?
 
-1. **SMDs** for every covariate. All should be below 0.1.
-2. **Variance ratios** close to 1.
-3. **Love plots** showing improvement.
-4. **Overlap:** PS histograms for treated vs control should overlap substantially.
+Before you ever look at the outcome, check these things:
 
-If balance is bad, the PS model needs improvement. Do NOT proceed to analysis with poor balance.
+1. **SMDs** for every covariate -- all should be below 0.1. If any are above 0.25, you have a problem.
+2. **Variance ratios** -- should be close to 1. If the treated group's age has twice the spread of the control group's age, that is a red flag.
+3. **Love plots** -- plot the SMD before and after matching/weighting. You want to see every dot move toward zero.
+4. **Overlap** -- make PS histograms for treated vs control and see if they overlap. If the two histograms barely touch, you don't have comparable groups.
+
+If balance is bad, **stop and fix your PS model or matching design.** Do NOT proceed to estimate the treatment effect with poor balance -- the estimate will be garbage.
 
 ## 9.8 All Methods Need the Same Assumptions
 
@@ -1971,6 +2217,12 @@ $$\tau = \mathbb{E}\big[\mathbb{E}[Y \mid Z\!=\!1, X] - \mathbb{E}[Y \mid Z\!=\!
 $$\hat{\tau}_{\text{IPW}} = \frac{1}{N}\sum_{i=1}^{N}\left[\frac{Z_i Y_i}{\hat{e}(X_i)} - \frac{(1-Z_i)Y_i}{1-\hat{e}(X_i)}\right]$$
 
 **IPW unbiasedness key step:** $\mathbb{E}\left[\frac{Z_i Y_i}{e(X_i)}\right] = \mathbb{E}[Y_i(1)]$
+
+**IPW weight expectation:** $\mathbb{E}[w_i] = 2$ where $w_i = Z_i/e(X_i) + (1-Z_i)/(1-e(X_i))$
+
+**Effective sample size:** $\text{ESS} \approx \left(\sum w_i\right)^2 / \sum w_i^2$
+
+**Composite distance with categorical penalty:** $d = (X_i - X_j)^2 + \lambda \cdot \mathbf{1}\{W_i \ne W_j\}$
 
 **Hajek (stabilized) estimator:**
 $$\hat{\tau}_{\text{Hajek}} = \frac{\sum \frac{Z_i Y_i}{\hat{e}(X_i)}}{\sum \frac{Z_i}{\hat{e}(X_i)}} - \frac{\sum \frac{(1-Z_i)Y_i}{1-\hat{e}(X_i)}}{\sum \frac{(1-Z_i)}{1-\hat{e}(X_i)}}$$
@@ -2217,6 +2469,67 @@ Treatment = new surgical technique. Outcome = recovery time. Unobserved confound
 Treated PS = {0.72, 0.80, 0.85, 0.91}. Control PS = {0.05, 0.10, 0.12, 0.15}.
 
 **Answer:** There is essentially ZERO overlap. Matching: no close matches exist (PS gap is huge). Subclassification: strata contain only treated or only control, not both. IPW: control weights $1/(1-0.05) = 20$, $1/(1-0.10) = 11$ are extreme; treated weights are mild. ALL methods are extrapolating or relying on unstable weights. Solution: trim to the overlap region (but here there IS no overlap region). Honest conclusion: the treatment effect cannot be reliably estimated for this population.
+
+---
+
+## Q29: Prove that E[w_i] = 2 for IPW weights
+
+Define $w_i = Z_i/e(X_i) + (1-Z_i)/(1-e(X_i))$.
+
+**Answer:** Use the tower property: $\mathbb{E}[w_i] = \mathbb{E}[\mathbb{E}[w_i \mid X_i]]$. Given $X_i$: $\mathbb{E}[Z_i/e(X_i) \mid X_i] = \mathbb{E}[Z_i \mid X_i]/e(X_i) = e(X_i)/e(X_i) = 1$. Similarly $\mathbb{E}[(1-Z_i)/(1-e(X_i)) \mid X_i] = (1-e(X_i))/(1-e(X_i)) = 1$. So $\mathbb{E}[w_i \mid X_i] = 2$ for any $X_i$, hence $\mathbb{E}[w_i] = 2$.
+
+---
+
+## Q30: ESS collapse with extreme propensity scores
+
+Half of $N = 200$ units have $e(X) = 0.5$; the other half have $e(X) = 0.01$. Approximately 1 of those 100 low-PS units is treated. Compute the weights and explain qualitatively what happens to ESS.
+
+**Answer:** For the 100 units with $e(X) = 0.5$: $w_i = 2$ regardless of treatment. For units with $e(X) = 0.01$: if treated, $w_i = 1/0.01 = 100$; if control, $w_i \approx 1.01$. So $\sum w_i \approx 100 \times 2 + 1 \times 100 + 99 \times 1.01 \approx 400$. But $\sum w_i^2 \approx 100 \times 4 + 1 \times 10000 + 99 \times 1.02 \approx 10500$. ESS $\approx 400^2/10500 \approx 15$, versus actual $N = 200$. One unit with weight 100 dominates. The estimator is technically unbiased but has enormous variance.
+
+---
+
+## Q31: Construct a population where sharp null is false but weak null is true
+
+**Answer:** Four units with potential outcomes:
+
+| $i$ | $Y_i(0)$ | $Y_i(1)$ | $\tau_i$ |
+|-----|----------|----------|----------|
+| 1 | 0 | 1 | +1 |
+| 2 | 0 | 1 | +1 |
+| 3 | 1 | 0 | -1 |
+| 4 | 1 | 0 | -1 |
+
+$\tau = (1 + 1 - 1 - 1)/4 = 0$, so the weak null is true. But $Y_i(1) \ne Y_i(0)$ for every $i$, so the sharp null is false. The individual effects cancel out on average but are nonzero individually.
+
+---
+
+## Q32: Deterministic assignment -- when does DM fail?
+
+Suppose $Y_i(0) = \alpha + \beta X_i + \varepsilon_i$ and $Y_i(1) = Y_i(0) + \tau$. Treatment is assigned by $Z_i = \mathbf{1}\{X_i > c\}$. Is $\hat{\tau}_{DM}$ unbiased for $\tau$?
+
+**Answer:** No. Under this rule, all treated units have high $X$ and all controls have low $X$. Since $Y_i(0)$ depends linearly on $X$, the treated group has systematically higher $Y(0)$ values. The DM estimator captures $\tau$ plus the mean difference in $\beta X$ between the groups, which is a positive bias term $\beta(\mathbb{E}[X \mid X > c] - \mathbb{E}[X \mid X \le c])$. Without randomization, the DM estimator confounds the treatment effect with the covariate imbalance.
+
+---
+
+## Q33: Interpreting PS model coefficients and post-matching SMD (exam-style R output)
+
+You fit `glm(Z ~ age + educ + married + black, family=binomial)` and get:
+
+| Coefficient | Estimate |
+|------------|---------|
+| (Intercept) | -3.00 |
+| age | 0.02 |
+| educ | 0.10 |
+| married | 0.70 |
+| black | 0.90 |
+
+After 1:1 PS matching, SMDs: age=0.06, educ=0.05, married=0.09, black=0.18.
+
+(a) What does the positive coefficient on `black` mean?
+(b) Which covariates remain problematic after matching?
+(c) How would you modify the matching to fix this?
+
+**Answer:** (a) Holding other covariates constant, being black is associated with higher log-odds of receiving treatment. This describes the **selection mechanism**, NOT a causal effect on $Y$. (b) `black` has SMD = 0.18, which exceeds the 0.10 threshold -- substantial residual imbalance. All other covariates are well-balanced (< 0.10). This is concerning because race is likely related to both treatment and outcome. (c) Impose exact matching (or near-fine balance) on race while still using PS for other covariates. Alternatively, add a large categorical penalty for mismatching on race in the distance structure: $d = d_{\text{PS}} + \lambda \cdot \mathbf{1}\{\text{race}_i \ne \text{race}_j\}$.
 
 ---
 
